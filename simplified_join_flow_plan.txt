@@ -1,0 +1,37 @@
+# Implementation Plan: Simplified & High-End Join Request Flow
+
+## 1. Objective
+Remove the "Representative Team" selection requirement during the initial league join request. Replace the current functional form with a premium, visually stunning confirmation modal that prioritizes branding consistency (Emerald/Gold/Slate) and user experience.
+
+## 2. Targeted Component Changes
+
+### A. Join League Modal (`components/JoinLeagueModal.tsx`)
+- **Logic Removal:** 
+    - Remove the `TEAMS` import and the `selectedTeamId` state.
+    - Remove the `<select>` dropdown and its associated validation.
+- **Visual Overhaul:**
+    - **Header:** Use a large, soft-colored icon (e.g., `Users` or `ShieldCheck` in `emerald-100`) with a subtle pulse animation.
+    - **Typography:** 
+        - Title: "Join the Syndicate" (using `text-slate-900` and `font-extrabold`).
+        - Description: "You're about to request access to **{leagueName}**. Once the admin approves your request, you'll be able to make your weekly picks and start building your pot."
+    - **Layout:** Use a clean, centered layout with ample white space and `rounded-3xl` corners for the modal card.
+- **Button Enhancements:**
+    - **Send Join Request (Primary):** Use a high-contrast emerald gradient (`bg-gradient-to-r from-emerald-600 to-emerald-500`). Add a "lift" animation on hover (`hover:-translate-y-0.5`) and a subtle outer glow/shadow.
+    - **Cancel (Secondary):** Use a clean slate-outline or ghost style that changes to a soft gray on hover.
+
+### B. Leagues Page (`pages/Leagues.tsx`)
+- **Callback Update:** 
+    - Modify the `handleJoinSubmit` function to no longer expect a `teamId` parameter.
+    - Update the mock member creation to leave `represented_team_id` as `undefined` (to be selected later by the user or assigned by the admin).
+
+## 3. Branding & Aesthetics
+- **Color Palette:** Strictly adhere to Emerald (`#059669`), Gold (`#fbbf24`), and Slate (`#0f172a`).
+- **Animations:** 
+    - Modal Entry: Use Tailwind's `animate-in fade-in zoom-in-95 duration-300`.
+    - Button Interaction: Use `transition-all duration-200` for all state changes (hover, active, focus).
+- **Iconography:** Use `lucide-react` icons with consistent stroke widths (2px) and soft backgrounds.
+
+## 4. Verification Steps
+- **Visual Check:** Ensure the modal looks like a premium "Welcome" card rather than a "Data Entry" form.
+- **Responsive Check:** Verify the modal remains centered and legible on small mobile devices (iPhone SE width).
+- **Flow Check:** Click "Join League" -> Modal appears instantly -> Click "Send Join Request" -> Success alert appears -> Modal closes smoothly.

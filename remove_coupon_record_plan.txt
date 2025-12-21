@@ -1,0 +1,39 @@
+# Implementation Plan: Remove Weekly Coupon Record Section
+
+## 1. Objective
+Remove the "Weekly Coupon Record" UI section (including the participant table and the external payout calculator) from the Admin Panel to declutter the interface, as requested.
+
+## 2. Target Component
+- **File:** `pages/Admin.tsx`
+- **Component:** `AdminPanel`
+
+## 3. Analysis of Dependencies
+The section to be removed contains specific logic and state that will become redundant:
+- **State:** `winningsInput` (used for the payout calculator).
+- **Handler:** `handleCalculateWinnings` (logic for the split calculation).
+- **Icons:** `Copy` and possibly `Calculator` (used in the section header/button).
+
+## 4. Implementation Steps
+
+### Step A: Logic Cleanup
+1.  **Remove State:** Delete the `useState` hook definition for `winningsInput`.
+2.  **Remove Handler:** Delete the `handleCalculateWinnings` function definition entirely.
+
+### Step B: UI Removal (JSX)
+1.  Locate the `div` container with the class `bg-indigo-50 rounded-2xl shadow-sm border border-indigo-100 p-8 lg:col-span-2`.
+2.  Verify this container houses the header `<h2>` with text "Weekly Coupon Record".
+3.  **Action:** Delete this entire `div` block and all its children (the Table and the Payout Input section).
+
+### Step C: Import Cleanup
+1.  Check the `lucide-react` import list.
+2.  Remove `Copy` and `Calculator` from the imports if they are no longer used in the rest of the file (likely unused after this change).
+
+## 5. Layout Integrity Check
+- The section to be removed sits at the bottom of the grid layout (`lg:col-span-2`).
+- **Expected Behavior:** Removing it will simply shorten the vertical height of the Admin Panel content area.
+- **Grid Layout:** The preceding "Pot Management" section also spans 2 columns. The layout will flow naturally without leaving gaps.
+
+## 6. Verification
+- Confirm the Admin Panel loads without errors.
+- Confirm the "Pot Management" section is the last visible element in the specific league view.
+- Ensure no "unused variable" warnings remain in the console regarding `winningsInput` or `handleCalculateWinnings`.

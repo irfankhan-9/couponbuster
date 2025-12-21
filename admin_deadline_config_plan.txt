@@ -1,0 +1,44 @@
+# Implementation Plan: League Deadline Configuration
+
+## 1. Objective
+- **Default Creation:** Ensure every newly created league defaults to a pick deadline of **Friday at 11:00 PM** (23:00).
+- **Admin Control:** Provide an interface in the Admin Panel to edit the deadline Day and Hour for any existing league.
+- **Immediate Sync:** Ensure that changing these settings updates the active week's countdown timer immediately.
+
+## 2. Targeted Component
+- **File:** `pages/Admin.tsx`
+- **Component:** `AdminPanel`
+
+## 3. Implementation Steps
+
+### Step A: Update Creation Logic
+1.  **Locate:** The `handleCreateLeague` function.
+2.  **Action:** Update the initial state of the `createdLeague` object.
+    - Change `pick_deadline_hour: 19` to `pick_deadline_hour: 23` (11 PM).
+    - Ensure `pick_deadline_day: 5` (Friday) remains the default.
+
+### Step B: Add Deadline Management Logic
+1.  **New State/Handlers:**
+    - Create a handler `handleDeadlineUpdate(newDay: number, newHour: number)` within `AdminPanel`.
+2.  **Data Update Logic:**
+    - **Update League:** Find the `activeLeague` in `MOCK_LEAGUES` and update its `pick_deadline_day` and `pick_deadline_hour`.
+    - **Update Active Week (Critical):** Find the open week for this league in `MOCK_WEEKS`. 
+    - **Date Calculation:** Modify the `deadline_at` timestamp of the active week to match the new Day/Hour setting while keeping the current week's timeframe.
+      - *Logic:* Take the current `deadline_at` Date object, set the day of week (using `setDate` difference) and set the hours.
+
+### Step C: Admin UI Addition
+1.  **Location:** In the "League Management Interface" (drill-down view), insert a new card below the "League Header" or alongside "Pot Management".
+2.  **Component:** "League Schedule Settings" Card.
+3.  **UI Elements:**
+    - **Day Selector:** A `<select>` dropdown mapping numbers 0-6 to Days (Sunday-Saturday).
+    - **Time Selector:** A `<select>` dropdown for hours (00:00 - 23:00), formatted as "11:00 PM".
+    - **Save Button:** Triggers `handleDeadlineUpdate`.
+
+## 4. Visuals
+- Use the existing Emerald/Slate design system.
+- Use `Clock` icon from `lucide-react` for the section header.
+
+## 5. Verification
+- **New League:** Create a league, verify deadline is Friday 23:00.
+- **Edit:** Change deadline to Saturday 12:00 PM.
+- **Check Dashboard:** Go to User Dashboard for that league, verify the "Deadline In" countdown calculates correctly to the new time.

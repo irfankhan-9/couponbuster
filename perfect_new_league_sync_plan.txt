@@ -1,0 +1,39 @@
+# Implementation Plan: Perfect New League Dashboard Synchronization
+
+## 1. Objective
+To guarantee that every league created via the Admin Panel provides the exact same high-fidelity user experience as the "Valleys Premier League" demo. Specifically, ensuring the "Make Your Picks" section is immediately visible and functional for newly approved members.
+
+## 2. The "Instant Week" Initialization
+- **Problem:** Currently, the Dashboard shows "No Active Week" if the Admin hasn't manually created a schedule for the new league.
+- **Solution:** Update the `handleCreateLeague` logic in `Admin.tsx` to automatically generate a "Week 1" entry in `MOCK_WEEKS` for that specific league ID the moment it is created.
+- **Behavior:** This ensures that when a user joins and gets approved, the `Dashboard.tsx` logic (`MOCK_WEEKS.find(...)`) successfully locates an active week and renders the `PickForm` component.
+
+## 3. High-Fidelity Component Mirroring
+- **PickForm.tsx Integration:** Ensure the `Dashboard.tsx` uses the shared `PickForm` component for ALL leagues.
+- **Dynamic Props:** The `PickForm` will receive:
+    - `week`: The dynamically generated Week 1 object (including the deadline date).
+    - `onSubmit`: A standardized handler that alerts the user and (theoretically) records the pick for the new league.
+- **Visuals:** The "Banker" (Gold Star) and "Cover" (Shield) sections will appear exactly as they do in the demo, using the global `TEAMS` list for selection.
+
+## 4. Administrative "Push" & User Refresh
+- **Push Changes Button:** In `Admin.tsx`, the "Push Changes" function will be the primary sync trigger. It will perform a state refresh on the mock data arrays, ensuring the new Week 1 and any membership approvals are broadcasted to the app's global state.
+- **User Side:** Upon clicking "Send Join Request" and then receiving Admin approval, the user's dashboard will automatically transition from the "Pending" screen (Clock icon) to the active "Make Your Picks" interface.
+
+## 5. Data Integrity for New Entities
+- **League Fees:** The `PickForm` UI doesn't explicitly show fees, but the Dashboard header's "Saved Pot" card will pull the `weekly_fee_pence` and `pot_deduction_pence` from the newly created league object to show accurate financial context.
+- **Leaderboard Initialization:** Brand new leagues will show a "Clean" leaderboard where all approved members start at 0 points/wins, maintaining the professional chart-and-list layout.
+
+## 6. Visual Consistency Checklist
+- **Rounded Corners:** All new league dashboard containers will use `rounded-2xl` and `shadow-sm` to match the demo.
+- **Typography:** Titles will use `text-3xl font-black` for maximum premium impact.
+- **Empty States:** If a league truly has no week (e.g. season end), it will show a high-fidelity "Off-Season" card with a `Calendar` icon rather than a broken or blank screen.
+
+## 7. Verification Steps
+1. **Admin Creation:** Create "West Wales Syndicate" with a £10 fee.
+2. **Auto-Week Check:** Confirm `MOCK_WEEKS` now contains `w-new-l3-1`.
+3. **Approval Sync:** Approve a test user (u2) for the new league.
+4. **Dashboard Verification:** Navigate to `/league/l3` as user u2 and confirm:
+    - The "West Wales Syndicate" title is present.
+    - The "Make Your Picks" section (Week 1) is visible with Team Dropdowns.
+    - The "Saved Pot" reflects £0.00 (correct for a new league).
+    - The "Back to Leagues" animated navigation is functional.

@@ -1,0 +1,52 @@
+# Implementation Plan: Admin Manual Deadline Override
+
+## 1. Objective
+Empower League Admins to manually toggle the enforcement of weekly deadlines. This allows Admins to "unlock" the market during usually closed periods (e.g., Saturday/Sunday) or extend the Friday deadline indefinitely by disabling the automated checks.
+
+## 2. Schema & Type Definitions (`types.ts`)
+We will extend the `League` interface to include a control flag.
+
+**New Property:**
+- `enable_automatic_deadlines`: `boolean`
+  - `true` (Default): The system checks `pick_deadline_day/hour` and closes the market automatically on weekends.
+  - `false` (Override): The system ignores the clock. The market remains **OPEN** 24/7 until this flag is turned back on.
+
+## 3. Logic Core (`utils/scheduler.ts`)
+The central intelligence for league status resides here. We will intercept the logic before it checks the date.
+
+**Algorithm Update:**
+1.  Receive `league` object.
+2.  **Check:** `if (league.enable_automatic_deadlines === false)`
+    - **Result:** Return `{ isOpen: true, deadlineDate: null/future }`.
+    - **Logic:** "Deadlines are OFF, therefore the Market is OPEN."
+3.  **Else:** Proceed with existing logic (checking Friday 11 PM vs. Current Time).
+
+## 4. Data Initialization (`constants.ts`)
+To ensure the app doesn't crash in "Production" (preview), we must migrate the existing mock data.
+- **Action:** Add `enable_automatic_deadlines: true` to all entries in `MOCK_LEAGUES`.
+- **Safety:** This ensures standard behavior stays intact immediately after deployment.
+
+## 5. Admin UI Implementation (`pages/Admin.tsx`)
+We will add a "Manual Override" control in the "League Schedule Settings" block.
+
+**UI Component:**
+- **Toggle Switch / Button Group:**
+  - **Option A:** "Automated (Standard)" -> Sets `true`.
+    - Visual: Green/Active style. Shows "Closes Friday @ 11 PM".
+  - **Option B:** "Manual Open (Unlimited)" -> Sets `false`.
+    - Visual: Amber/Warning style. Shows "Market Unlocked - No Deadline".
+
+**Interaction:**
+- Clicking "Manual Open" immediately updates the state.
+- Because `Dashboard.tsx` relies on `calculateLeagueWindow`, the User Interface updates instantly upon next refresh/poll without needing complex sync logic.
+
+## 6. Verification & Safety
+- **Scenario 1 (Standard):** Flag is `true`. It is Saturday. Result: Market Closed (Correct).
+- **Scenario 2 (Emergency Open):** Admin sets Flag to `false`. It is Saturday. Result: Market Open (Correct).
+- **Scenario 3 (Restoration):** Admin sets Flag back to `true` on Saturday. Result: Market Closes immediately (Correct).
+
+## 7. Execution Order
+1.  Update `types.ts`.
+2.  Update `constants.ts` (Mock Data).
+3.  Update `utils/scheduler.ts` (The Logic).
+4.  Update `pages/Admin.tsx` (The Switch).

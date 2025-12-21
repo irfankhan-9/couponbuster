@@ -1,0 +1,57 @@
+# Implementation Plan: Premium Profile Dropdown System
+
+## 1. Objective
+To replace the static profile display in the global navigation with a "Billion-Dollar" interactive dropdown experience. The design will prioritize fluid motion, high-end aesthetics (Glassmorphism), and strict data-integrity (read-only info), ensuring a consistent "Syndicate Executive" feel across the entire platform.
+
+## 2. Visual Identity & Design Philosophy
+- **Palette:** Deep Emerald (`bg-emerald-900`), Pure White, and Slate (`text-slate-900`).
+- **Surface:** A floating "Glass" card using `backdrop-blur-md` and a "layered shadow" effect (`shadow-2xl`) to create depth.
+- **Typography:** Inter (Bold for names, Medium for metadata, Heavy for actions).
+- **Consistency:** Every edge case (hover states, focus rings, and divider lines) will adhere to the existing 2024/25 "Coupon Busters" brand system.
+
+## 3. Structural Changes (components/Layout.tsx)
+
+### A. The Trigger (Nav Profile)
+- Transform the current profile section into a `button` element.
+- **Interaction:** Add a subtle "Down Chevron" that rotates 180 degrees when active.
+- **Visuals:** The user's avatar (initials) will gain a soft emerald outer-glow when the menu is open.
+
+### B. The Dropdown Card (The "Floating Vault")
+- **Placement:** Absolute positioned, anchored to the right, offset by 12px from the bottom of the nav bar.
+- **Container:** `max-w-[280px]` width, `rounded-[2rem]` (oversized corners for a premium feel), `border border-slate-100`.
+- **Logic:** Implement a "Click-Outside" handler and an "Escape Key" listener to ensure the menu closes intuitively.
+
+## 4. Content & Functionality (Uneditable & Secure)
+
+### Section 1: Identity Header
+- **Layout:** Centered or Left-aligned with a large, high-res avatar circle.
+- **Name:** Displayed in `text-slate-900` and `font-black`. Strict read-only state.
+- **Email:** Displayed in `text-slate-400` and `text-xs`. Strict read-only state.
+- **Visual Divider:** A subtle `border-b border-slate-50` separating identity from actions.
+
+### Section 2: Account Actions
+- **Logout Button:**
+  - **Style:** "Destructive but Classy" — `text-slate-400` that shifts to a soft `red-500` on hover.
+  - **Icon:** A minimalist `LogOut` icon from `lucide-react`.
+  - **Animation:** A 2px "horizontal nudge" on hover.
+
+## 5. "Billion-Dollar" Micro-interactions & Animations
+- **Entry Dynamics:**
+  - **Animation:** Use a "Scale & Fade" spring. `scale-95` to `scale-100`, `opacity-0` to `opacity-100`.
+  - **Transition:** `duration-200 ease-out`.
+  - **Origin:** The dropdown will originate from the top-right anchor point for a natural "expansion" feel.
+- **Hover States:** All menu items will use a `bg-slate-50` background change with a `duration-300` fade, ensuring no jarring transitions.
+- **Active State:** The trigger button will maintain a "pressed" visual state while the menu is open to anchor the user's focus.
+
+## 6. Implementation Steps
+1. **State Injection:** Add `isProfileOpen` state to `Layout.tsx`.
+2. **Refactor Trigger:** Update the `User` section in the desktop and mobile nav to handle the toggle click.
+3. **Dropdown Construction:** Create the absolute-positioned menu container with the glassmorphic blur and shadow.
+4. **Data Binding:** Pass `currentUser` details into the dropdown, explicitly ensuring no `<input>` or `contenteditable` attributes are used.
+5. **Animation Integration:** Wrap the dropdown in a conditional render with Tailwind's `animate-in fade-in zoom-in-95 slide-in-from-top-2` utility classes.
+
+## 7. Success Criteria
+- **Feel:** Opening the menu feels like opening a high-end banking app or a luxury car dashboard.
+- **Security:** User information is clearly displayed but visually "locked" (no cursors or input borders).
+- **Responsiveness:** The menu adjusts perfectly for mobile users, potentially shifting to a bottom-sheet style or centered card on smaller screens.
+- **Branding:** Zero deviations from the Emerald/Slate color hierarchy.

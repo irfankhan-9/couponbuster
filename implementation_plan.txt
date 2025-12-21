@@ -1,0 +1,51 @@
+# Implementation Plan: "Banker & Pot" Logic Update
+
+## 1. Concept Overview
+The application will be updated to support a hybrid "Coupon + Savings" model:
+- **Financial Split:** Weekly fees are split into two buckets:
+    1. **Coupon Stake:** Majority of fee (e.g., £120 from 7 players) goes onto a real-world accumulator bet.
+    2. **Pot Builder:** Remainder (e.g., £20) stays in the app's accumulated pot.
+- **Picking Strategy:** 
+    - **Pick 1 (The Banker):** Used by Admin for the real-world bet. Counts for League Points.
+    - **Pick 2 (The Cover):** Not used for money. Counts for League Points.
+- **Payouts:** If the real-world bet wins, the total is divided equally among active players immediately. If it loses, the "Pot Builder" portion remains saved.
+
+## 2. Type Definitions Updates (types.ts)
+- **League Interface:**
+  - Add `pot_deduction_pence`: number (The fixed amount per user that stays in the pot, e.g., £2.50 or £3.00 depending on league settings).
+  - *Note:* `weekly_fee_pence` remains total. `Coupon Stake` is calculated as `weekly_fee - pot_deduction`.
+- **Week Interface:**
+  - Add `coupon_winnings_pence`: number | null (To record if the real-world bet won and how much).
+- **Pick Interface:**
+  - No schema change needed, but UI logic treats `pick1_team_id` as "The Banker".
+
+## 3. User Experience Updates
+### Dashboard (pages/Dashboard.tsx)
+- **Financial Header Cards:**
+  - **Card A: This Week's Coupon:** Displays `(Active Players * (Weekly Fee - Pot Deduction))`. e.g., "£120 Stake".
+  - **Card B: The Banked Pot:** Displays cumulative pot (only the "Pot Builder" portion from previous weeks + this week).
+- **Pick Form (components/PickForm.tsx):**
+  - Update UI text to explicitly label:
+    - **Pick 1:** "THE BANKER (Goes on the real bet & counts for points)" - Add visual emphasis (Gold border?).
+    - **Pick 2:** "THE COVER (Points only)".
+
+### Leaderboard / Scoring
+- Logic remains: 1 win = 1 point. Both picks count towards the league table.
+
+## 4. Admin Workflow Updates (pages/Admin.tsx)
+### "The Coupon" View (New Section)
+- A dedicated list for the current open week showing **only Pick 1** from every active user.
+- Purpose: Admin copies these teams to place the real-world bet.
+
+### Result & Payout Tool
+- **Input Field:** "Total Coupon Winnings (£)".
+- **Calculation:** `Input Amount / Number of Active Players`.
+- **Action:** "Distribute Winnings".
+  - This doesn't necessarily add to the internal 'Pot', but alerts users of their payout share (e.g., "You won £142!").
+  - If Winnings = 0, the week is closed, and only the 'Pot Builder' amount remains in the League Pot.
+
+## 5. Execution Steps
+1.  **Modify `MOCK_LEAGUES`** in `constants.ts` to include `pot_deduction_pence`.
+2.  **Update `Dashboard.tsx`** to calculate and display the split finances (Stake vs Pot).
+3.  **Update `PickForm.tsx`** labels to reflect "Banker" vs "Cover".
+4.  **Update `Admin.tsx`** to show the "Coupon Generator" list (all Pick 1s).

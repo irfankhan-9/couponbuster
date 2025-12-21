@@ -1,0 +1,41 @@
+# Implementation Plan: Admin-to-Dashboard Sync Integration
+
+## 1. Objective
+Establish a seamless data flow between the Admin Panel and the User Dashboards. This ensures that administrative actions—approving members, adjusting scores, and overriding financial values—are reflected instantly across the application's UI, maintaining branding consistency and operational integrity.
+
+## 2. Synchronization Strategy (Shared State Model)
+Since the application currently operates on a sophisticated mock-data system (`constants.ts`), we will utilize the shared memory space to act as a "Single Source of Truth." 
+- **Mechanism:** Administrative changes will directly mutate the `MOCK_MEMBERS` and `MOCK_LEAGUES` arrays.
+- **Push Changes Trigger:** The "Push Changes" button will be upgraded from a simple alert to a global state-refresh trigger, ensuring all components re-render with the latest administrative overrides.
+
+## 3. Feature: Access Gatekeeping (Membership Control)
+- **Logic:** In `pages/Dashboard.tsx`, the `membership` check will be strictly tied to the `status` field in `MOCK_MEMBERS`.
+- **Admin Action:** When an admin clicks "Approve" in `Admin.tsx`, the member's status shifts from `'pending'` to `'approved'`.
+- **User Experience:** 
+    - **Before Approval:** User sees the "Joining Request Pending" screen (Clock icon).
+    - **After Approval & Push:** Upon the next load or "Sync," the User Dashboard automatically unlocks the "Make Your Picks" form and "Leaderboard" access.
+
+## 4. Feature: Score & Points Management
+- **Admin Control:** In the "Points Management" section of the Admin Drill-down, the plus/minus buttons will directly update the `points` and `wins` values of the specific `LeagueMember` object.
+- **User Experience:** The `Leaderboard` component (used in the Dashboard) pulls data dynamically. Any change made by the Admin will be reflected in the user's rank and point total on their dashboard.
+
+## 5. Feature: Financial Overrides (Saved Pot Editing)
+- **Admin UI Addition:** Add a "Financial Settings" section to the League Management view in `Admin.tsx`.
+- **Input Field:** A currency-formatted input allowing the Admin to manually set or adjust the `current_pot_pence` value for the league.
+- **Purpose:** Allows admins to correct rounding errors, add external bonuses, or manually record payouts.
+- **User Experience:** The "Saved Pot" card in the Dashboard header will display this updated value immediately, styled with the premium emerald gradient.
+
+## 6. The "Push Changes" Workflow
+1. **Admin Edits:** Admin makes several changes (approves 2 users, adds 1 point to 'Gareth', updates Pot to £200.00).
+2. **Commit Action:** Admin clicks the "Push Changes" button at the top of the Admin Panel.
+3. **Execution:** 
+    - The app triggers a "Syncing..." visual state (loading spinner on button).
+    - Data is "Saved" (mutated in the mock database).
+    - A success toast/notification appears: "League synced! Changes are now live for all participants."
+4. **Broadcast:** User UI updates upon navigation or refresh.
+
+## 7. Success Criteria
+- **Zero Latency:** Approved users should gain dashboard access immediately after the "Push" action.
+- **Data Integrity:** Points changed in Admin match the points shown in the Leaderboard exactly.
+- **Aesthetic Stability:** All new admin inputs follow the "Emerald/Slate" design system with rounded-xl corners and bold typography.
+- **Security Logic:** Non-admins attempting to access a league they aren't approved for are correctly redirected to the `/leagues` overview.

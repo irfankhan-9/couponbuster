@@ -1,0 +1,79 @@
+# Landing Page Design Plan: Coupon Busters
+
+## 1. Branding & Visual Identity
+- **Primary Colors:** Emerald Green (`bg-emerald-800`), Gold (`text-yellow-400` for "Banker" accents), Slate (`text-slate-900` for text).
+- **Vibe:** Professional, exciting, trustworthy (financial context), and communal (team spirit).
+- **Typography:** Inter (Clean, modern sans-serif).
+
+## 2. Page Structure & Content
+
+### A. Navigation Bar
+- **Logo:** "Coupon Busters" with Trophy Icon.
+- **Links:** How it Works, Benefits, Pricing, FAQ.
+- **Actions:** "Login" (Secondary), "Start a League" (Primary CTA - Emerald Button).
+
+### B. Hero Section
+- **Headline:** "The Football Betting League That Builds a Pot."
+- **Subheadline:** "Run your work or pub syndicate without the headache. We automate the weekly collections, the picks, and the payouts. You just pick the winners."
+- **Primary CTA:** "Create Your League"
+- **Secondary CTA:** "See Demo"
+- **Visual:** A split-screen graphic showing a winning "Coupon" slip on one side and a growing "Pot of Gold" on the other.
+
+### C. Social Proof (Trust Signals)
+- **Stats Bar:** 
+  - "£50,000+ Paid Out This Season"
+  - "1,200+ Active Leagues"
+  - "100% Secure Payments (Stripe)"
+- **Logos:** "As seen in" or "Technology partners" (Stripe, SportRadar icons).
+
+### D. Use Cases (Who is this for?)
+- **The Office Syndicate:** "Stop chasing Dave from Accounts for his £2. We handle the payments automatically."
+- **The Pub Team:** "Raise money for the end-of-season tour while having a punt every week."
+- **Mates Groups:** "Settle the debate on who knows ball, and build a holiday fund while you do it."
+
+### E. Pain Points (The "Before" State)
+- **Problem 1:** "Chasing payments every week is awkward and time-consuming."
+- **Problem 2:** "Keeping track of who picked who on WhatsApp is a nightmare."
+- **Problem 3:** "One bad bet and the money is gone with nothing to show for it."
+
+### F. Why Us? (The Solution)
+- **Automated Wallet:** Users deposit funds; we auto-deduct weekly fees. No pay, no play.
+- **The Banker System:** Distinct "Banker" (Real Money) vs "Cover" (Points) system adds strategy.
+- **The Safety Pot:** Even if the bet loses, a portion of the entry fee goes into a locked "Season Pot" for a guaranteed payout/party at the end.
+
+### G. How It Works (4 Steps)
+1.  **Join a League:** Request access and pick your Representative Team (e.g., Swansea City).
+2.  **Weekly Picks:** Choose your "Banker" (goes on the real bet) and your "Cover" (for points).
+3.  **The Accumulator:** The Admin gets a generated "Coupon" of all Banker picks to place the bet.
+4.  **Win or Save:** If the bet wins, instant payout. If it loses, the Pot grows.
+
+### H. Benefits
+- **Transparent Admin:** Everyone sees who paid and who picked.
+- **Secure Handling:** Money is held securely until payout or pot withdrawal.
+- **Leaderboards:** Real-time scoring and league tables.
+
+### I. Pricing & Money Split (The Model)
+*Visual breakdown of a typical £20 Weekly Entry:*
+- **£18 Stake:** Goes into the live betting pool.
+- **£2 Pot Builder:** Goes into the safe League Pot.
+- **Platform Fee:** (Optional mention: e.g., We take a tiny % on deposits, free for admins).
+
+### J. Testimonials
+- *"We used to argue every week about money. Now we just argue about football. The Savings Pot paid for our Christmas party."* - Gareth, Cardiff.
+- *"The Admin tools are a lifesaver. Generating the accumulator slip takes 30 seconds."* - Sarah, Leeds.
+
+### K. CTA (Call to Action)
+- **Headline:** "Ready to Bust the Coupon?"
+- **Button:** "Start Your League Now - Free for 30 Days"
+- **Subtext:** "No credit card required for setup."
+
+### L. FAQ
+- "Is this gambling?" (Yes/No clarification - we are a management tool for private syndicates).
+- "How do I withdraw?"
+- "What if someone misses a week?"
+- "Can I customize the stake amount?"
+
+## 3. Implementation Details
+- Create `pages/Landing.tsx`.
+- Update `App.tsx` to route `/` to Landing and move Dashboard/Leagues to protected routes.
+- Ensure the design is fully responsive (Mobile-first).

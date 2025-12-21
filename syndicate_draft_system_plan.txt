@@ -1,0 +1,70 @@
+# Implementation Plan: The Syndicate Sequential Draft System
+
+## 1. Objective
+Replace the concurrent `PickForm` with a **State-Driven Draft Room**. This enforces a strict 1-by-1 pick order, prevents duplicate team selection across the entire league for the week, and rotates the pick order weekly to ensure long-term fairness.
+
+## 2. Schema & Type Definitions (`types.ts`)
+We must expand the `Week` interface to track the live state of the draft.
+
+**New Properties for `Week`:**
+- `pick_order`: `string[]` (Array of user IDs defining the sequence).
+- `current_turn_user_id`: `string | null` (Who is picking right now).
+- `draft_round`: `1 | 2` (1 = Banker Pick, 2 = Cover Pick).
+- `draft_status`: `'upcoming' | 'active' | 'completed'`.
+
+## 3. Core Logic Utility (`utils/draftLogic.ts`)
+We will create a pure logic file to handle the complex state transitions.
+
+**Key Functions:**
+1.  **`rotateWeeklyOrder(previousOrder: string[]): string[]`**
+    - Takes `[A, B, C, D]`.
+    - Returns `[B, C, D, A]`. (First becomes Last, everyone shifts up).
+    
+2.  **`getAvailableTeams(allTeams: Team[], currentPicks: Pick[], currentRound: number): Team[]`**
+    - *Global Rule:* A team picked by *anyone* in the current week is removed from the pool.
+    - *Exceptions:* N/A (Strict unique teams).
+    
+3.  **`processTurnHandover(week: Week, currentOrder: string[]): Partial<Week>`**
+    - Determines who goes next.
+    - If End of Round 1 -> Switch to Round 2, Reset to First User.
+    - If End of Round 2 -> Set Status to 'completed'.
+
+## 4. UI Component: The Draft Room (`components/DraftRoom.tsx`)
+This replaces `PickForm`.
+
+**Visual Sections:**
+1.  **The Ticker:** A visual list of users.
+    - **Past:** Green Check + Team Logo.
+    - **Current:** Pulse Animation + "Picking Now".
+    - **Future:** Dimmed.
+2.  **The Interaction Zone:**
+    - **If My Turn:** Show `<select>` dropdown (Filtered using `getAvailableTeams`). Show "Confirm Pick" button.
+    - **If Not My Turn:** Show "Waiting for [Name]..." with a refresh/polling indicator.
+3.  **Round Indicator:** Clearly labels "ROUND 1: BANKER (Real Money)" or "ROUND 2: COVER (Points)".
+
+## 5. Integration Points
+
+### A. Dashboard (`pages/Dashboard.tsx`)
+- Logic: Check `week.draft_status`.
+- If `active`: Render `<DraftRoom>`.
+- If `completed`: Render a read-only summary of picks.
+- **Sync:** The Dashboard needs to re-fetch/re-calculate `availableTeams` whenever a pick is made (simulated via state updates in `constants`).
+
+### B. Admin Panel (`pages/Admin.tsx`)
+- **Initialization:** When creating a new Week, generate the `pick_order` based on the previous week's rotation.
+- **Overrides:** Add a "Manage Draft" section.
+    - **"Force Skip":** Admin moves turn to next user (current user gets auto-assigned or no-pick).
+    - **"Reset Round":** In case of catastrophe, reset the draft pointer.
+
+## 6. Execution Steps
+1.  **Update `types.ts`** with new Week fields.
+2.  **Update `constants.ts`** to initialize mock data with these fields (prevent crashes).
+3.  **Create `utils/draftLogic.ts`** for the rotation and filtering algorithms.
+4.  **Create `components/DraftRoom.tsx`** UI.
+5.  **Update `Dashboard.tsx`** to swap the old form for the new Room.
+6.  **Refine `Admin.tsx`** to handle the weekly rotation generation.
+
+## 7. Verification
+- **Scenario:** User A picks Man City. User B logs in immediately. Man City should NOT be in User B's dropdown.
+- **Scenario:** User A finishes Round 1 pick. System updates to User B.
+- **Scenario:** Last user finishes Round 1. System updates to User A for Round 2.
