@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+        @apply antialiased text-slate-900;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+}
+
+@layer utilities {
+    .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .pt-safe {
+        padding-top: env(safe-area-inset-top);
+    }
+
+    .px-mobile {
+        @apply px-5 sm:px-6 lg:px-8;
+    }
+
+    @keyframes pulse-glow {
+
+        0%,
+        100% {
+            box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4);
+        }
+
+        50% {
+            box-shadow: 0 0 20px 10px rgba(52, 211, 153, 0);
+        }
+    }
+
+    .animate-pulse-glow {
+        animation: pulse-glow 3s infinite;
+    }
+
+    .skinny-line-dash {
+        background-image: linear-gradient(to right, #34d399 50%, transparent 50%);
+        background-size: 10px 1px;
+        background-repeat: repeat-x;
+    }
+
+    .skinny-line-dash-vertical {
+        background-image: linear-gradient(to bottom, #34d399 50%, transparent 50%);
+        background-size: 1px 10px;
+        background-repeat: repeat-y;
+    }
+
+    .glass-oracle {
+        @apply bg-white/10 backdrop-blur-md border border-white/20;
+        box-shadow: 0 0 15px rgba(52, 211, 153, 0.3);
+    }
+
+    .aurora-glow {
+        @apply absolute rounded-full opacity-20 pointer-events-none;
+        filter: blur(100px);
+    }
+}
