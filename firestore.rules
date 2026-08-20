@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // Helper function to check if user is signed in
     function isSignedIn() {
       return request.auth != null;
@@ -10,11 +10,12 @@ service cloud.firestore {
     // USERS
     // Anyone signed in can read user profiles (needed for leaderboards)
     // Only the user can edit their own profile
+    // Cloud Function can update rank_title
     match /users/{userId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
-    
+
     // LEAGUES
     // Anyone can read leagues (for directory)
     // Authenticated users can create leagues
@@ -23,12 +24,12 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn() && (
-        request.auth.uid == resource.data.owner_id || 
+        request.auth.uid == resource.data.owner_id ||
         (resource.data.league_admins != null && request.auth.uid in resource.data.league_admins)
       );
       allow delete: if isSignedIn();
     }
-    
+
     // MEMBERS
     // Authenticated users can read memberships
     // Anyone can create a membership request (Join)
@@ -39,7 +40,7 @@ service cloud.firestore {
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
-    
+
     // WEEKS
     // Authenticated users can read weeks
     // Creation/Updates restricted to admins (but for MVP allowing auth users to support Admin Panel)
@@ -47,13 +48,43 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
     }
-    
+
     // PICKS
     // Authenticated users can read picks
     // Authenticated users can create/update picks (DraftRoom/Dashboard)
     match /picks/{pickId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
+    }
+
+    // LEAGUE CHAMPIONS
+    // Anyone signed in can read (for global leaderboard)
+    // Only Firebase Admin SDK (Cloud Functions) can write
+    match /league_champions/{leagueId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only Cloud Functions can update
+    }
+
+    // GLOBAL LEAGUE
+    // Global league configuration - anyone signed in can read, admins can update
+    match /global_league/{leagueId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // GLOBAL LEAGUE ENTRIES
+    // Entries for global championship - anyone signed in can read/write
+    match /global_league_entries/{entryId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // GLOBAL LEAGUE REQUESTS
+    // Join requests for global league - anyone signed in can create/read
+    match /global_league_requests/{requestId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
     }
   }
 }

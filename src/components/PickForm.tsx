@@ -47,7 +47,20 @@ export const PickForm: React.FC<PickFormProps> = ({ week, onSubmit, existingPick
 
   // Filter Leagues
   const bankerLeagues = LEAGUES.filter(l => l.type === 'banker').sort((a, b) => a.name.localeCompare(b.name));
-  const coverLeagues = LEAGUES.filter(l => l.type === 'cover').sort((a, b) => a.name.localeCompare(b.name));
+  const excludedRoundTwoLeagueIds = new Set([
+    'greek',
+    'swiss',
+    'austrian',
+    'danish',
+    'norwegian',
+    'swedish',
+    'czech',
+    'croatian',
+    'polish'
+  ]);
+  const coverLeagues = LEAGUES
+    .filter(l => l.type === 'cover' && !excludedRoundTwoLeagueIds.has(l.id))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const getTeamsForLeague = (leagueId: string) => {
     return TEAMS.filter(t => t.league_id === leagueId).sort((a, b) => a.name.localeCompare(b.name));

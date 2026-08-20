@@ -6,6 +6,14 @@ export enum UserRole {
   GLOBAL_ADMIN = 'global-admin',
 }
 
+// Rank Titles for top performers
+export enum RankTitle {
+  GLOBAL_CROWN_CHAMPION = 'global_crown_champion',
+  CROWN_CHAMPION = 'crown_champion',
+  SILVER_SULTAN = 'silver_sultan',
+  BRONZE_BOSS = 'bronze_boss',
+}
+
 export interface User {
   id: string;
   email: string;
@@ -13,6 +21,9 @@ export interface User {
   role: UserRole;
   wallet_balance_pence: number;
   avatar_url?: string;
+  rank_title?: RankTitle | null;
+  league_champion_of?: string | null;
+  is_global_crown_champion?: boolean;
 }
 
 export interface Team {
@@ -95,4 +106,66 @@ export interface LeaderboardEntry {
   points: number;
   wins: number;
   adjustment_points?: number;
+  rank_title?: RankTitle | null;
+}
+
+// League Champions - stores #1, #2, #3 for each league
+export interface LeagueChampion {
+  league_id: string;
+  league_name: string;
+  champion_user_id: string | null;
+  champion_name: string;
+  points: number;
+  wins: number;
+  second_user_id: string | null;
+  second_name: string;
+  second_points: number;
+  third_user_id: string | null;
+  third_name: string;
+  third_points: number;
+  updated_at: string;
+}
+
+// Global Leaderboard Entry - shows who's #1 in each league
+export interface GlobalLeaderboardEntry {
+  league_id: string;
+  league_name: string;
+  user_id: string;
+  user_name: string;
+  rank: number;
+  points: number;
+  wins: number;
+  rank_title: RankTitle | null;
+}
+
+// Global League - configuration for the global competition
+export interface GlobalLeague {
+  id: string;
+  entry_stake_pence: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Global League Entry - individual entry in the global competition
+export interface GlobalLeagueEntry {
+  id: string;
+  global_league_id: string;
+  user_id: string;
+  display_name: string;
+  total_points: number;
+  wins: number;
+  rank: number;
+  is_global_crown_champion: boolean;
+  joined_at: string;
+}
+
+// Aggregated user stats across all leagues
+export interface AggregatedUserStats {
+  user_id: string;
+  user_name: string;
+  total_points: number;
+  total_wins: number;
+  leagues_count: number;
+  leagues: string[];
 }

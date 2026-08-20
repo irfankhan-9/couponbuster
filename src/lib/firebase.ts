@@ -4,13 +4,13 @@ import { getFirestore } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyAv8F2LSQZA6yD1MBBkH65XXAMgyXoPX18",
-    authDomain: "couponbusters-c4645.firebaseapp.com",
-    projectId: "couponbusters-c4645",
-    storageBucket: "couponbusters-c4645.firebasestorage.app",
-    messagingSenderId: "722442290180",
-    appId: "1:722442290180:web:663f55ffd03a236f6de151",
-    measurementId: "G-NK335HM9YG"
+    apiKey: "AIzaSyDA42dpbPEUwS6aOweo-cHoMdsdVnO3nHc",
+    authDomain: "uponbuster.firebaseapp.com",
+    projectId: "uponbuster",
+    storageBucket: "uponbuster.firebasestorage.app",
+    messagingSenderId: "443828007969",
+    appId: "1:443828007969:web:0b280de7c42d3b8b719f60",
+    measurementId: undefined
 };
 
 // Initialize Firebase

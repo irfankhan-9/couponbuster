@@ -30,8 +30,20 @@ export const DraftRoom: React.FC<DraftRoomProps> = ({
     const currentRound = week.draft_round;
 
     // 1. Filter Leagues based on round
+    const excludedRoundTwoLeagueIds = new Set([
+        'greek',
+        'swiss',
+        'austrian',
+        'danish',
+        'norwegian',
+        'swedish',
+        'czech',
+        'croatian',
+        'polish'
+    ]);
     const allowedLeagues = LEAGUES.filter(l => {
         if (currentRound === 1) return l.type === 'banker';
+        if (currentRound === 2 && excludedRoundTwoLeagueIds.has(l.id)) return false;
         return true; // All 13 for Cover
     });
 

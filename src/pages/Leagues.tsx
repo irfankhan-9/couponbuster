@@ -1,24 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { addDoc, collection } from 'firebase/firestore';
+import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { useLeagues, useAllMembers } from '../hooks/useSyndicateData';
+import { useLeagues, useAllMembers, useUsers } from '../hooks/useSyndicateData';
 import { JoinLeagueModal } from '../components/JoinLeagueModal';
-import { Users, Lock, Globe, ShieldCheck, ChevronRight, AlertCircle } from 'lucide-react';
+import { ChampionBadge } from '../components/ChampionBadge';
+import { RankTitle } from '../types';
+import { Users, Lock, Globe, ShieldCheck, ChevronRight, AlertCircle, Crown } from 'lucide-react';
 import { formatCurrency } from '../utils/scoring';
 
 export const Leagues: React.FC = () => {
   const [user, authLoading] = useAuthState(auth);
   const { leagues, loading: leaguesLoading } = useLeagues();
   const { members, loading: membersLoading } = useAllMembers();
+  const { users, loading: usersLoading } = useUsers();
 
   const [selectedLeague, setSelectedLeague] = useState<{ id: string, name: string } | null>(null);
   const [isJoining, setIsJoining] = useState(false);
   const [joinSuccess, setJoinSuccess] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
 
-  const isLoading = authLoading || leaguesLoading || membersLoading;
+  const isLoading = authLoading || leaguesLoading || membersLoading || usersLoading;
+
+  // Calculate champions for each league
+  const leagueChampions = useMemo(() => {
+    const champions: Record<string, { user_id: string; user_name: string; points: number }> = {};
+
+    leagues.forEach((league) => {
+      const leagueMembers = members
+        .filter(m => m.league_id === league.id && m.status === 'approved')
+        .map(m => {
+          const u = users.find(u => u.id === m.user_id);
+          return {
+            user_id: m.user_id,
+            user_name: u?.display_name || 'Unknown',
+            points: m.points,
+            adjustment_points: m.adjustment_points || 0
+          };
+        })
+        .sort((a, b) => {
+          if (b.points !== a.points) return b.points - a.points;
+          return b.adjustment_points - a.adjustment_points;
+        });
+
+      if (leagueMembers.length > 0) {
+        champions[league.id] = leagueMembers[0];
+      }
+    });
+
+    return champions;
+  }, [leagues, members, users]);
 
   const handleJoinClick = (league: { id: string, name: string }) => {
     setSelectedLeague(league);
@@ -29,15 +61,26 @@ export const Leagues: React.FC = () => {
     try {
       setJoinError(null);
       setIsJoining(true);
-      await addDoc(collection(db, 'members'), {
-        league_id: selectedLeague.id,
-        user_id: user.uid,
-        status: 'pending',
-        is_admin: false,
-        joined_at: new Date().toISOString(),
-        points: 0,
-        wins: 0
-      });
+            await addDoc(collection(db, 'members'), {
+                league_id: selectedLeague.id,
+                user_id: user.uid,
+                status: 'pending',
+                is_admin: false,
+                joined_at: new Date().toISOString(),
+                points: 0,
+                wins: 0,
+                adjustment_points: 0
+            });
+
+            // Auto-create/refresh the user profile so they have a record
+            await setDoc(doc(db, 'users', user.uid), {
+                display_name: user.displayName || user.email?.split('@')[0] || 'Member',
+                email: user.email || '',
+                role: 'member',
+                rank_title: null,
+                total_winnings_pence: 0,
+                created_at: new Date().toISOString()
+            }, { merge: true });
       setJoinSuccess('Join request sent');
       setSelectedLeague(null);
     } catch (e: any) {
@@ -96,6 +139,7 @@ export const Leagues: React.FC = () => {
           const membership = isMember(league.id);
           const approvedCount = getApprovedMemberCount(league.id);
           const isFull = approvedCount >= league.max_players;
+          const champion = leagueChampions[league.id];
 
           return (
             <div key={league.id} className="group bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8 flex flex-col justify-between hover:shadow-xl hover:border-emerald-100 transition-all duration-300 relative overflow-hidden">
@@ -107,9 +151,21 @@ export const Leagues: React.FC = () => {
                   <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 group-hover:bg-white group-hover:border-emerald-100 transition-colors">
                     {league.privacy === 'public' ? <Globe className="h-6 w-6 text-slate-400 group-hover:text-emerald-600 transition-colors" /> : <Lock className="h-6 w-6 text-slate-400 group-hover:text-emerald-600 transition-colors" />}
                   </div>
-                  <span className={`text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border shadow-sm ${isFull ? 'bg-red-50 text-red-600 border-red-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
-                    {isFull ? 'League Full' : league.privacy}
-                  </span>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className={`text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border shadow-sm ${isFull ? 'bg-red-50 text-red-600 border-red-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
+                      {isFull ? 'League Full' : league.privacy}
+                    </span>
+                    {/* Champion Indicator */}
+                    {champion && (
+                      <Link
+                        to="/leaderboard"
+                        className="flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-full border border-yellow-100 hover:border-yellow-200 transition-colors"
+                      >
+                        <Crown className="h-3 w-3 text-yellow-500 fill-current" />
+                        <span className="text-[9px] font-black text-yellow-700 uppercase tracking-wider">{champion.user_name}</span>
+                      </Link>
+                    )}
+                  </div>
                 </div>
 
                 <h3 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">{league.name}</h3>

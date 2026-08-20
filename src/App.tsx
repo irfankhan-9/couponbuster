@@ -11,6 +11,9 @@ import { Leagues } from './pages/Leagues';
 import { Landing } from './pages/Landing';
 import Login from './components/Login';
 import { ResetPassword, ResetStandalone } from './pages/Reset';
+import { GlobalLeaderboard } from './components/GlobalLeaderboard';
+import { GlobalLeagueBetting } from './components/GlobalLeagueBetting';
+import { GlobalLeagueLeaderboard } from './components/GlobalLeagueLeaderboard';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const [user, loading] = useAuthState(auth);
@@ -62,6 +65,21 @@ const App: React.FC = () => {
         <Route path="/admin" element={
           <ProtectedRoute>
             <Layout><AdminPanel /></Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/leaderboard" element={
+          <ProtectedRoute>
+            <Layout><GlobalLeaderboard /></Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/global-league" element={
+          <ProtectedRoute>
+            <Layout><GlobalLeagueBetting /></Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/global-league/leaderboard" element={
+          <ProtectedRoute>
+            <Layout><GlobalLeagueLeaderboard /></Layout>
           </ProtectedRoute>
         } />
 

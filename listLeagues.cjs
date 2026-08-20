@@ -2,7 +2,7 @@ const admin = require('firebase-admin');
 
 // Initialize with the project ID provided by the user
 admin.initializeApp({
-    projectId: 'couponbusters-c4645'
+    projectId: 'uponbuster'
 });
 
 const db = admin.firestore();

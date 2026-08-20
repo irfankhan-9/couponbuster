@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { doc, runTransaction, collection } from 'firebase/firestore';
+import { doc, runTransaction, collection, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { useLeagues, useLeagueMembers, useActiveWeek, useWeekPicks, useUsers } from '../hooks/useSyndicateData';
 import { formatCurrency } from '../utils/scoring';
@@ -27,6 +27,32 @@ export const Dashboard: React.FC = () => {
 
   const isLoading = authLoading || leaguesLoading || membersLoading || usersLoading || weekLoading;
   const hasError = leaguesError || membersError || usersError || weekError;
+
+  // 1. Data Integrity: Locate League
+  const activeLeague = leagues.find(l => l.id === leagueId);
+
+  // 2. Strict Guarding: Verify Membership Record
+  const membership = members.find(m => m.league_id === activeLeague?.id && m.user_id === user?.uid);
+
+  const currentUserProfile = allUsers.find(u => u.id === user?.uid) as User | undefined;
+
+  const isOwner = user?.uid === activeLeague?.owner_id;
+
+  // Self-heal: if the user profile document is missing (common for brand-new members)
+  // create it from the Auth profile so we don't bounce them back.
+  React.useEffect(() => {
+    if (user && !currentUserProfile && !isLoading) {
+      setDoc(doc(db, 'users', user.uid), {
+        display_name: user.displayName || user.email?.split('@')[0] || 'Member',
+        email: user.email || '',
+        role: 'member',
+        rank_title: null,
+        total_winnings_pence: 0,
+        created_at: new Date().toISOString()
+      }, { merge: true }).catch(() => { /* non-fatal */ });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, currentUserProfile, isLoading]);
 
   if (isLoading) {
     return (
@@ -60,21 +86,24 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  // 1. Data Integrity: Locate League
-  const activeLeague = leagues.find(l => l.id === leagueId);
-
-  // 2. Strict Guarding: Verify Membership Record
-  const membership = members.find(m => m.league_id === activeLeague?.id && m.user_id === user?.uid);
-
-  const currentUserProfile = allUsers.find(u => u.id === user?.uid) as User | undefined;
-
-  // SCENARIO A: League doesn't exist or user is not a member/rejected
-  if (!activeLeague || !membership || membership.status === 'rejected' || !currentUserProfile) {
+  // SCENARIO A: League doesn't exist OR user is neither a member nor the owner
+  if (!activeLeague || (!membership && !isOwner) || (membership && membership.status === 'rejected')) {
     return <Navigate to="/leagues" replace />;
   }
 
-  // SCENARIO B: Access Restricted (Pending Status)
-  if (membership.status === 'pending') {
+  // After self-heal, if still missing, treat as member (don't redirect)
+  const effectiveUserProfile = currentUserProfile || (user ? {
+    id: user.uid,
+    email: user.email || '',
+    display_name: user.displayName || user.email?.split('@')[0] || 'Member',
+    role: 'member' as any,
+    rank_title: null as any,
+    total_winnings_pence: 0,
+    created_at: new Date().toISOString()
+  } as any : null);
+
+  // SCENARIO B: Access Restricted (Pending Status) — owners bypass this
+  if (membership && membership.status === 'pending' && !isOwner) {
     return (
       <div className="max-w-2xl mx-auto mt-12 text-center p-12 bg-white rounded-[3rem] shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-1000">
         <div className="w-24 h-24 bg-amber-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8 relative">
@@ -268,7 +297,7 @@ export const Dashboard: React.FC = () => {
                 leagueMembers={members}
                 users={allUsers as User[]}
                 currentPicks={picks}
-                currentUser={currentUserProfile}
+                currentUser={effectiveUserProfile}
                 onPickSubmit={handlePickSubmit}
               />
             ) : (
@@ -294,7 +323,7 @@ export const Dashboard: React.FC = () => {
                   leagueMembers={members}
                   users={allUsers as User[]}
                   currentPicks={picks}
-                  currentUser={currentUserProfile}
+                  currentUser={effectiveUserProfile}
                   onPickSubmit={handlePickSubmit}
                 />
               ) : (

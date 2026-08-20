@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { addDoc, updateDoc, deleteDoc, doc, collection, runTransaction, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { addDoc, updateDoc, deleteDoc, doc, collection, runTransaction, query, where, getDocs, writeBatch, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { useLeagues, useAllMembers, useAllWeeks, useUsers, useActiveWeek, useWeekPicks } from '../hooks/useSyndicateData';
 import {
@@ -31,6 +32,7 @@ import { TEAMS } from '../constants';
 import logoFull from '../assets/logo_full.png';
 import logoNav from '../assets/logo_nav.png';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { GlobalLeagueAdmin } from '../components/GlobalLeagueAdmin';
 
 export const AdminPanel: React.FC = () => {
     const [user] = useAuthState(auth);
@@ -143,7 +145,7 @@ export const AdminPanel: React.FC = () => {
         }
     }
 
-    // Admin Access Gate (Name + Password)
+    // Admin Access Gate (Name + Password) — auths into Firebase Auth as a master admin
     if (!authorized) {
         const handleGateSubmit = async (e: React.FormEvent) => {
             e.preventDefault();
@@ -155,12 +157,52 @@ export const AdminPanel: React.FC = () => {
                 if (!validName || !validPass) {
                     throw new Error('Invalid credentials');
                 }
+
+                // Master admin Firebase Auth credentials (created once, persists across deployments)
+                const masterEmail = 'admin@uponbuster.firebaseapp.com';
+                const masterPassword = 'CB-Master-2026!';
+
+                try {
+                    await signInWithEmailAndPassword(auth, masterEmail, masterPassword);
+                } catch (signInErr: any) {
+                    if (signInErr?.code === 'auth/user-not-found' || signInErr?.code === 'auth/invalid-credential') {
+                        await createUserWithEmailAndPassword(auth, masterEmail, masterPassword);
+                    } else {
+                        throw signInErr;
+                    }
+                }
+
+                // Update Auth profile displayName so anywhere that reads user.displayName
+                // (and falls back to email-split) resolves to the operator's actual username.
+                const operatorName = gateName.trim();
+                if (auth.currentUser) {
+                    try {
+                        await updateProfile(auth.currentUser, { displayName: operatorName });
+                    } catch (profileErr) {
+                        console.warn('Could not update admin auth profile displayName', profileErr);
+                    }
+                }
+
+                // Mirror the username into the Firestore user doc so leaderboards and
+                // member lists never show the literal string "admin".
+                if (auth.currentUser) {
+                    await setDoc(doc(db, 'users', auth.currentUser.uid), {
+                        display_name: operatorName,
+                        email: masterEmail,
+                        role: 'global_admin',
+                        rank_title: null,
+                        total_winnings_pence: 0,
+                        created_at: new Date().toISOString()
+                    }, { merge: true });
+                }
+
                 setAuthorized(true);
                 sessionStorage.setItem('cb_admin_session', 'true');
                 setGateName('');
                 setGatePassword('');
             } catch (err: any) {
-                setGateError('Access denied. Check name and password.');
+                console.error('Admin gate error:', err);
+                setGateError(err?.message || 'Access denied. Check name and password.');
             } finally {
                 setGateLoading(false);
             }
@@ -248,15 +290,31 @@ export const AdminPanel: React.FC = () => {
     // Handlers
     const handleCreateLeague = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!user) return;
+
+        // Ensure we have a Firebase auth user — gate may have just signed in
+        let currentUser = auth.currentUser || user;
+        if (!currentUser) {
+            // Try to wait briefly for auth state to populate
+            await new Promise(r => setTimeout(r, 300));
+            currentUser = auth.currentUser || user;
+        }
+        if (!currentUser) {
+            setCreateError('You must be logged in to create a league. Please refresh and log in again.');
+            return;
+        }
+
+        if (!newLeague.name?.trim()) {
+            setCreateError('Please enter a league name.');
+            return;
+        }
 
         try {
             setCreateError(null);
             setIsLaunching(true);
             // 1. Create League Doc
             const leagueRef = await addDoc(collection(db, 'leagues'), {
-                name: newLeague.name,
-                owner_id: user.uid,
+                name: newLeague.name.trim(),
+                owner_id: currentUser.uid,
                 privacy: 'private',
                 weekly_fee_pence: newLeague.weeklyFee * 100,
                 pot_deduction_pence: newLeague.potDeduction * 100,
@@ -281,11 +339,27 @@ export const AdminPanel: React.FC = () => {
                 draft_status: 'upcoming'
             });
 
+            // 3. Ensure the admin user profile exists with their real username.
+            // NOTE: Admin is intentionally NOT auto-enrolled as a league member.
+            // They remain the league owner (owner_id above) for management rights,
+            // but they should not appear in the member/leaderboard lists as a
+            // regular player.
+            const operatorName = currentUser.displayName || 'Operator';
+            await setDoc(doc(db, 'users', currentUser.uid), {
+                display_name: operatorName,
+                email: currentUser.email || 'admin@uponbuster.firebaseapp.com',
+                role: 'global_admin',
+                rank_title: null,
+                total_winnings_pence: 0,
+                created_at: new Date().toISOString()
+            }, { merge: true });
+
             setIsCreating(false);
             setNewLeague({ name: '', maxPlayers: 20, weeklyFee: 20, potDeduction: 2 });
         } catch (e: any) {
-            console.error(e);
-            setCreateError(e?.message || 'Failed to create league');
+            console.error('Create league error:', e);
+            const msg = e?.code ? `[${e.code}] ${e.message}` : (e?.message || 'Unknown error');
+            setCreateError(msg);
         } finally {
             setIsLaunching(false);
         }
@@ -1145,7 +1219,7 @@ export const AdminPanel: React.FC = () => {
                         </div>
                     </div >
 
-                    {isOwner && (
+                    {isAdmin && (
                         <div className="bg-red-50 rounded-2xl border border-red-100 p-6 lg:col-span-2">
                             <h3 className="text-lg font-black text-red-700 mb-2">Danger Zone</h3>
                             <p className="text-xs text-red-600/80 mb-4">Deleting this league will remove all weeks, picks, and memberships. This action cannot be undone.</p>
@@ -1216,6 +1290,9 @@ export const AdminPanel: React.FC = () => {
                         </button>
                     </div>
                 </div>
+
+                {/* Global League Admin Section */}
+                <GlobalLeagueAdmin />
 
                 {isCreating && (
                     <div className="relative bg-white rounded-3xl shadow-2xl border border-emerald-100 p-5 md:p-10 animate-in slide-in-from-top-8 duration-500">

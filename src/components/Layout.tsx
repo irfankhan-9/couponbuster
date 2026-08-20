@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Trophy, User, Menu, X, ChevronDown, LogOut, Mail, Shield, LayoutDashboard, Globe } from 'lucide-react';
-import { UserRole } from '../types';
+import { Trophy, User, Menu, X, ChevronDown, LogOut, Mail, Shield, LayoutDashboard, Globe, Crown } from 'lucide-react';
+import { UserRole, RankTitle } from '../types';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useUsers } from '../hooks/useSyndicateData';
+import { ChampionBadge } from './ChampionBadge';
 import logoNav from '../assets/logo_nav.png';
 import headerLogo from './logo.png';
 import logoIcon from '../assets/logo_icon.png';
@@ -99,7 +100,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 <ChevronDown className={`h-4 w-4 text-emerald-500 transition-transform duration-500 ${isProfileOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Billion-Dollar Dropdown Card */}
+                {/* Billion-Dollar Dropdown Card */}
               {isProfileOpen && (
                 <div className="absolute right-0 top-full mt-4 w-72 bg-white/95 backdrop-blur-xl rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] border border-slate-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 slide-in-from-top-4 duration-300 origin-top-right">
                   {/* Header: Identity */}
@@ -112,6 +113,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                         <Shield className="h-3 w-3 text-emerald-900" fill="currentColor" />
                       </div>
                     </div>
+                    {/* User's Title (if any) */}
+                    {currentUser?.rank_title && (
+                      <div className="flex justify-center mb-3">
+                        <ChampionBadge title={currentUser.rank_title as RankTitle} size="md" />
+                      </div>
+                    )}
+                    {/* Global Crown Champion Badge */}
+                    {currentUser?.is_global_crown_champion && (
+                      <div className="flex justify-center mb-3">
+                        <ChampionBadge title={RankTitle.GLOBAL_CROWN_CHAMPION} size="lg" animated />
+                      </div>
+                    )}
                     <h3 className="text-xl font-black text-slate-900 tracking-tight">{currentUser?.display_name}</h3>
                     <div className="flex items-center justify-center mt-1 space-x-1.5">
                       <Mail className="h-3 w-3 text-slate-300" />
@@ -133,6 +146,32 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                     >
                       <span className="text-sm font-bold">My Syndicates</span>
                       <Globe className="h-4 w-4 opacity-40 group-hover:opacity-100 transition-opacity" />
+                    </Link>
+
+                    <Link
+                      to="/global-league"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="group flex items-center justify-between px-5 py-3 rounded-2xl text-slate-500 hover:text-yellow-700 hover:bg-yellow-50 transition-all duration-200"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Crown className="h-4 w-4 text-yellow-500" />
+                        <span className="text-sm font-bold">Global League</span>
+                      </div>
+                      <Crown className="h-4 w-4 opacity-40 group-hover:opacity-100 transition-opacity text-yellow-500" />
+                    </Link>
+
+                    <Link
+                      to="/leaderboard"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="group flex items-center justify-between px-5 py-3 rounded-2xl text-slate-500 hover:text-yellow-700 hover:bg-yellow-50 transition-all duration-200"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold">Leaderboard</span>
+                        {currentUser?.rank_title && (
+                          <ChampionBadge title={currentUser.rank_title as RankTitle} size="sm" />
+                        )}
+                      </div>
+                      <Trophy className="h-4 w-4 opacity-40 group-hover:opacity-100 transition-opacity text-yellow-500" />
                     </Link>
 
                     {currentUser?.role === UserRole.LEAGUE_ADMIN && (
@@ -207,6 +246,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 >
                   <span>My Syndicates</span>
                   <Globe className="h-5 w-5 opacity-70" />
+                </Link>
+
+                <Link
+                  to="/leaderboard"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center justify-between w-full bg-yellow-900/20 text-yellow-100 px-6 py-4 rounded-2xl font-bold hover:bg-yellow-900/30 transition-colors border border-yellow-500/20"
+                >
+                  <div className="flex items-center gap-2">
+                    <Trophy className="h-5 w-5 opacity-70 text-yellow-400 fill-current" />
+                    <span>Leaderboard</span>
+                  </div>
+                  <Trophy className="h-4 w-4 opacity-50" />
                 </Link>
 
                 {currentUser?.role === UserRole.LEAGUE_ADMIN && (
