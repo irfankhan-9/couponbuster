@@ -7,13 +7,41 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Helper: is this particular field the only change?
+    // Used to gate writes to a single path so admins can edit earned_titles,
+    // displayed_title_id, pinned_title_ids without being able to edit other fields.
+    function onlyChangedFields(allowedPaths) {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(allowedPaths);
+    }
+
     // USERS
     // Anyone signed in can read user profiles (needed for leaderboards)
-    // Only the user can edit their own profile
-    // Cloud Function can update rank_title
+    // Self can edit their own profile (cannot stomp on admin-managed fields)
+    // Any signed-in user can update the admin-managed fields on ANY user
+    // doc — used by the client-side admin Titles panel while Cloud
+    // Functions are not deployed. Once functions are deployed, tighten
+    // this to a global-admin server-side check.
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && request.auth.uid == userId;
+
+      // Self write — non-admins may not stomp on the admin-managed fields.
+      allow update: if isSignedIn() && request.auth.uid == userId
+        && (!('earned_titles' in request.resource.data) ||
+            request.resource.data.earned_titles == resource.data.earned_titles)
+        && (!('displayed_title_id' in request.resource.data) ||
+            request.resource.data.displayed_title_id == resource.data.displayed_title_id)
+        && (!('pinned_title_ids' in request.resource.data) ||
+            request.resource.data.pinned_title_ids == resource.data.pinned_title_ids);
+
+      // Any signed-in user may update the admin-managed fields on any user.
+      // The Admin page UI gates this behind league-admin / global-admin.
+      allow update: if isSignedIn()
+        && onlyChangedFields(['earned_titles', 'displayed_title_id', 'pinned_title_ids']);
+
+      // Other writes (create / delete) — only self.
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
     // LEAGUES
@@ -85,6 +113,18 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
+    }
+
+    // ADMIN TITLES
+    // Admin-defined title templates (e.g. "Plumbing League Champion").
+    // Read = any signed-in user (so client can render granted titles).
+    // Write = any signed-in user (client-mode fallback while Cloud Functions
+    // aren't deployed). The Admin page UI gates this behind league-admin /
+    // global-admin. Once functions are deployed, tighten this to a
+    // server-side global-admin check.
+    match /admin_titles/{adminTitleId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
   }
 }

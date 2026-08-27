@@ -1,7 +1,8 @@
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import type { League, LeagueMember, Week, Pick, LeagueChampion, RankTitle, GlobalLeague, GlobalLeagueEntry } from '../types';
+import { RankTitle } from '../types';
+import type { League, LeagueMember, Week, Pick, LeagueChampion, GlobalLeague, GlobalLeagueEntry } from '../types';
 
 export function useLeagues() {
     const [snapshot, loading, error] = useCollection(collection(db, 'leagues'));

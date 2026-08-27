@@ -5,6 +5,7 @@ import { auth } from '../lib/firebase';
 import { useLeagues, useAllMembers, useUsers } from '../hooks/useSyndicateData';
 import { PodiumDisplay } from './PodiumDisplay';
 import { ChampionBadge, CompactBadge } from './ChampionBadge';
+import { UserNameWithTitle } from './UserNameWithTitle';
 import { RankTitle, GlobalLeaderboardEntry } from '../types';
 import { Trophy, ChevronRight, Users, Star, Crown } from 'lucide-react';
 
@@ -265,9 +266,11 @@ export const GlobalLeaderboard: React.FC = () => {
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-black text-slate-900 truncate">
-                        {champion.user_name}
-                      </p>
+                      <UserNameWithTitle
+                        userId={champion.user_id}
+                        name={champion.user_name}
+                        nameClassName="font-black text-slate-900 truncate"
+                      />
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-lg font-black text-amber-600">{champion.points}</span>
                         <span className="text-[10px] font-black text-slate-400 uppercase">pts</span>
@@ -346,9 +349,12 @@ export const GlobalLeaderboard: React.FC = () => {
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-black text-slate-900 truncate text-sm md:text-base">
-                      {champion.user_name}
-                    </span>
+                    <UserNameWithTitle
+                      userId={champion.user_id}
+                      name={champion.user_name}
+                      titleSize="xs"
+                      nameClassName="font-black text-slate-900 truncate text-sm md:text-base"
+                    />
                     {index === 0 && <Crown className="h-3.5 w-3.5 text-yellow-500 fill-current animate-pulse flex-shrink-0" />}
                   </div>
                   {/* League tag */}

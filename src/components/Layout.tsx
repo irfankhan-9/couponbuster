@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Trophy, User, Menu, X, ChevronDown, LogOut, Mail, Shield, LayoutDashboard, Globe, Crown } from 'lucide-react';
+import { Trophy, User, Menu, X, ChevronDown, LogOut, Mail, Shield, LayoutDashboard, Globe, Crown, BadgeCheck } from 'lucide-react';
 import { UserRole, RankTitle } from '../types';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useUsers } from '../hooks/useSyndicateData';
+import { useDisplayedTitle } from '../hooks/useUserTitles';
 import { ChampionBadge } from './ChampionBadge';
+import { InlineTitleBadge } from './InlineTitleBadge';
 import logoNav from '../assets/logo_nav.png';
 import headerLogo from './logo.png';
 import logoIcon from '../assets/logo_icon.png';
@@ -22,6 +24,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const [authUser] = useAuthState(auth);
   const { users } = useUsers();
   const currentUser = users.find(u => u.id === authUser?.uid);
+  const displayedTitle = useDisplayedTitle(authUser?.uid);
 
   const isActive = (path: string) => location.pathname === path ? 'bg-emerald-700 text-white' : 'text-emerald-100 hover:bg-emerald-600 hover:text-white';
 
@@ -94,7 +97,12 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                   <User className="h-6 w-6 text-emerald-100" />
                 </div>
                 <div className="text-left">
-                  <p className="text-xs font-black text-white leading-tight">{currentUser?.display_name}</p>
+                  <p className="text-xs font-black text-white leading-tight truncate max-w-[140px] inline-flex items-center gap-1.5">
+                    <Link to="/profile" className="truncate hover:underline decoration-yellow-400/50 underline-offset-2">
+                      {currentUser?.display_name}
+                    </Link>
+                    {displayedTitle && <InlineTitleBadge title={displayedTitle} size="xs" />}
+                  </p>
                   <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">Syndicate Member</p>
                 </div>
                 <ChevronDown className={`h-4 w-4 text-emerald-500 transition-transform duration-500 ${isProfileOpen ? 'rotate-180' : ''}`} />
@@ -109,23 +117,45 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                       <div className="h-20 w-20 rounded-3xl bg-emerald-50 flex items-center justify-center mx-auto border-2 border-emerald-100 shadow-inner">
                         <User className="h-10 w-10 text-emerald-600" />
                       </div>
-                      <div className="absolute -bottom-1 -right-1 h-6 w-6 bg-yellow-400 rounded-lg flex items-center justify-center border-2 border-white shadow-sm">
-                        <Shield className="h-3 w-3 text-emerald-900" fill="currentColor" />
-                      </div>
+                      {currentUser?.role === 'global-admin' && (
+                        <div className="absolute -bottom-1 -right-1 h-6 w-6 bg-yellow-400 rounded-lg flex items-center justify-center border-2 border-white shadow-sm">
+                          <Shield className="h-3 w-3 text-emerald-900" fill="currentColor" />
+                        </div>
+                      )}
+                      {currentUser?.role === 'league-admin' && (
+                        <div className="absolute -bottom-1 -right-1 h-6 w-6 bg-indigo-400 rounded-lg flex items-center justify-center border-2 border-white shadow-sm">
+                          <Shield className="h-3 w-3 text-white" fill="currentColor" />
+                        </div>
+                      )}
                     </div>
-                    {/* User's Title (if any) */}
-                    {currentUser?.rank_title && (
+                    {/* User's chosen display title (preferred) — fall back to legacy rank_title */}
+                    {displayedTitle ? (
+                      <Link to="/profile" className="inline-flex justify-center mb-3 hover:scale-105 transition-transform">
+                        <ChampionBadge
+                          title={displayedTitle.badge_variant}
+                          size="md"
+                          animated={false}
+                        />
+                      </Link>
+                    ) : currentUser?.rank_title ? (
                       <div className="flex justify-center mb-3">
                         <ChampionBadge title={currentUser.rank_title as RankTitle} size="md" />
                       </div>
-                    )}
+                    ) : null}
                     {/* Global Crown Champion Badge */}
                     {currentUser?.is_global_crown_champion && (
                       <div className="flex justify-center mb-3">
                         <ChampionBadge title={RankTitle.GLOBAL_CROWN_CHAMPION} size="lg" animated />
                       </div>
                     )}
-                    <h3 className="text-xl font-black text-slate-900 tracking-tight">{currentUser?.display_name}</h3>
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                      <Link to="/profile" className="hover:underline">{currentUser?.display_name}</Link>
+                    </h3>
+                    {displayedTitle && (
+                      <p className="mt-1 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                        {displayedTitle.rank_label} · {displayedTitle.source_name}
+                      </p>
+                    )}
                     <div className="flex items-center justify-center mt-1 space-x-1.5">
                       <Mail className="h-3 w-3 text-slate-300" />
                       <span className="text-xs font-bold text-slate-400 truncate max-w-[180px]">{currentUser?.email}</span>
@@ -149,6 +179,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                     </Link>
 
                     <Link
+                      to="/profile"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="group flex items-center justify-between px-5 py-3 rounded-2xl text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-all duration-200"
+                    >
+                      <div className="flex items-center gap-2">
+                        <BadgeCheck className="h-4 w-4 text-emerald-500" />
+                        <span className="text-sm font-bold">My Profile</span>
+                      </div>
+                      {displayedTitle && <InlineTitleBadge title={displayedTitle} size="xs" />}
+                    </Link>
+
+                    <Link
                       to="/global-league"
                       onClick={() => setIsProfileOpen(false)}
                       className="group flex items-center justify-between px-5 py-3 rounded-2xl text-slate-500 hover:text-yellow-700 hover:bg-yellow-50 transition-all duration-200"
@@ -167,9 +209,11 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold">Leaderboard</span>
-                        {currentUser?.rank_title && (
+                        {displayedTitle ? (
+                          <InlineTitleBadge title={displayedTitle} size="xs" />
+                        ) : currentUser?.rank_title ? (
                           <ChampionBadge title={currentUser.rank_title as RankTitle} size="sm" />
-                        )}
+                        ) : null}
                       </div>
                       <Trophy className="h-4 w-4 opacity-40 group-hover:opacity-100 transition-opacity text-yellow-500" />
                     </Link>
@@ -239,6 +283,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               </div>
 
               <div className="space-y-3 mb-8">
+                <Link
+                  to="/profile"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center justify-between w-full bg-emerald-900/50 text-emerald-100 px-6 py-4 rounded-2xl font-bold hover:bg-emerald-800 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <BadgeCheck className="h-5 w-5 opacity-70" />
+                    <span>My Profile</span>
+                  </div>
+                  {displayedTitle && <InlineTitleBadge title={displayedTitle} size="xs" />}
+                </Link>
+
                 <Link
                   to="/leagues"
                   onClick={() => setIsMobileMenuOpen(false)}

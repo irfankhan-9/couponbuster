@@ -33,6 +33,8 @@ import logoFull from '../assets/logo_full.png';
 import logoNav from '../assets/logo_nav.png';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { GlobalLeagueAdmin } from '../components/GlobalLeagueAdmin';
+import { TitlesAdminPanel } from '../components/TitlesAdminPanel';
+import { UserNameWithTitle } from '../components/UserNameWithTitle';
 
 export const AdminPanel: React.FC = () => {
     const [user] = useAuthState(auth);
@@ -804,9 +806,13 @@ export const AdminPanel: React.FC = () => {
                                         const u = users.find(u => u.id === req.user_id);
                                         return (
                                             <div key={req.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col gap-3 md:flex-row md:justify-between md:items-center transition-all hover:bg-white hover:shadow-md">
-                                                <div>
-                                                    <p className="font-bold text-slate-900 break-words">{u?.display_name || 'Unknown User'}</p>
-                                                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-tight">Joined: {new Date(req.joined_at).toLocaleDateString()}</p>
+                                                <div className="min-w-0">
+                                                    <UserNameWithTitle
+                                                        userId={req.user_id}
+                                                        name={u?.display_name || 'Unknown User'}
+                                                        nameClassName="font-black text-slate-900 break-words"
+                                                    />
+                                                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-tight mt-1">Joined: {new Date(req.joined_at).toLocaleDateString()}</p>
                                                 </div>
                                                 <div className="flex flex-col gap-2 w-full md:w-auto md:flex-row">
                                                     <button onClick={() => handleApprove(req.id)} className="w-full md:w-auto bg-emerald-600 text-white px-4 py-3 md:py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 shadow-sm transition-colors">Approve</button>
@@ -839,7 +845,12 @@ export const AdminPanel: React.FC = () => {
                                             <div key={member.id} className="flex flex-col p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 rounded-xl space-y-3">
                                                 <div className="flex justify-between items-center">
                                                     <div className="flex flex-col min-w-0 pr-3">
-                                                        <span className="text-sm font-black text-slate-700 break-words">{u?.display_name || 'Unknown'}</span>
+                                                        <UserNameWithTitle
+                                                            userId={member.user_id}
+                                                            name={u?.display_name || 'Unknown'}
+                                                            nameClassName="text-sm font-black text-slate-700 break-words"
+                                                            noUnderline
+                                                        />
                                                         <div className="flex flex-wrap gap-1.5 mt-1.5">
                                                             {bankerTeam ? (
                                                                 <div className="inline-flex items-center px-2 py-0.5 rounded-md bg-yellow-50 text-yellow-700 border border-yellow-100 text-[9px] font-black uppercase tracking-tight">
@@ -987,7 +998,12 @@ export const AdminPanel: React.FC = () => {
                                                         <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-600 text-white font-black text-lg shadow-md">
                                                             {index + 1}
                                                         </div>
-                                                        <span className="flex-1 font-bold text-slate-800">{displayName}</span>
+                                                        <UserNameWithTitle
+                                                            userId={userId}
+                                                            name={displayName}
+                                                            nameClassName="flex-1 font-bold text-slate-800"
+                                                            noUnderline
+                                                        />
                                                         {currentOpenWeek.week_number === 1 && (
                                                             <div className="flex gap-2">
                                                                 <button
@@ -1293,6 +1309,9 @@ export const AdminPanel: React.FC = () => {
 
                 {/* Global League Admin Section */}
                 <GlobalLeagueAdmin />
+
+                {/* Titles Administration Section */}
+                <TitlesAdminPanel />
 
                 {isCreating && (
                     <div className="relative bg-white rounded-3xl shadow-2xl border border-emerald-100 p-5 md:p-10 animate-in slide-in-from-top-8 duration-500">

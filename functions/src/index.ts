@@ -12,11 +12,68 @@ const RANK_TITLES: Record<number, string | null> = {
   2: 'bronze_boss'       // #3
 };
 
+// Title metadata for each rank position
+const TITLE_META: Record<number, { type: string; rank_label: string; badge_variant: string }> = {
+  0: { type: 'league_champion', rank_label: '#1', badge_variant: 'crown_champion' },
+  1: { type: 'league_runner_up', rank_label: '#2', badge_variant: 'silver_sultan' },
+  2: { type: 'league_third', rank_label: '#3', badge_variant: 'bronze_boss' }
+};
+
+/**
+ * Build (or refresh) the EarnedTitle record for a specific league+rank placement.
+ * Returns the EarnedTitle object; same id is reused so users don't accumulate dupes.
+ * NEW: tags the title as auto_current_season + is_temporary so it can be revoked
+ * automatically when the user drops out of the top 3.
+ */
+function buildEarnedTitle(
+  leagueId: string,
+  leagueName: string,
+  rankIndex: number,
+  points: number
+) {
+  const meta = TITLE_META[rankIndex];
+  const id = `${leagueId}_${meta.badge_variant}`;
+  return {
+    id,
+    type: meta.type,
+    source_id: leagueId,
+    source_name: leagueName,
+    rank_label: meta.rank_label,
+    earned_at: new Date().toISOString(),
+    badge_variant: meta.badge_variant,
+    points_at_earn: points,
+    category: 'auto_current_season',
+    is_temporary: true
+  };
+}
+
+/**
+ * Ensure the caller is a global admin. Looks up the user doc and verifies role.
+ */
+async function ensureGlobalAdmin(context: functions.https.CallableContext): Promise<string> {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Sign in required.');
+  }
+  const callerUid = context.auth.uid;
+  const callerDoc = await db.collection('users').doc(callerUid).get();
+  const role = callerDoc.exists ? callerDoc.data()?.role : null;
+  if (role !== 'global_admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Global admin role required.');
+  }
+  return callerUid;
+}
+
 /**
  * Cloud Function: onPointsUpdate
  *
  * Triggered when a member's points are updated.
  * Automatically recalculates league rankings and assigns/removes titles.
+ *
+ * Reliability behaviors:
+ *  - Tag newly-issued titles as category='auto_current_season' + is_temporary=true.
+ *  - Sweep away any auto_current_season EarnedTitle whose user has been
+ *    displaced from the top 3, so titles only stick while the user actually
+ *    holds the spot. Admin-historical titles are NOT touched.
  */
 export const onPointsUpdate = functions.firestore
   .document('members/{memberId}')
@@ -27,7 +84,7 @@ export const onPointsUpdate = functions.firestore
 
     // Only process if points actually changed (not on delete or no-op updates)
     if (!after) {
-      // Member was deleted, clean up if needed
+      // Member was deleted
       return null;
     }
 
@@ -104,11 +161,11 @@ export const onPointsUpdate = functions.firestore
 
       await db.collection('league_champions').doc(leagueId).set(championData);
 
-      // 6. Update user titles
+      // 6. Update user titles (single rank_title kept for backward compatibility,
+      //    plus the multi-title EarnedTitle catalogue).
       const batch = db.batch();
 
-      // First, clear all existing titles for this league (we'll reassign)
-      // Get all users who had league_champion_of set to this league
+      // 6a. Clear any user's single rank_title/league_champion_of for this league
       const previousChampions = await db
         .collection('users')
         .where('league_champion_of', '==', leagueId)
@@ -121,18 +178,33 @@ export const onPointsUpdate = functions.firestore
         });
       });
 
-      // Assign titles to new top 3
+      // 6b. Assign top-3 rank_title (legacy field) + EarnedTitle records.
+      const currentTop3 = new Set(top3UserIds);
       for (let i = 0; i < sortedMembers.length && i < 3; i++) {
         const member = sortedMembers[i];
         if (member?.user_id) {
-          batch.update(db.collection('users').doc(member.user_id), {
+          const userRef = db.collection('users').doc(member.user_id);
+          batch.update(userRef, {
             rank_title: RANK_TITLES[i],
             league_champion_of: leagueId
+          });
+
+          // Append this league's earned title to the user's earned_titles array.
+          // Use arrayUnion so we never duplicate the same id; the timestamp updates
+          // each time it changes hands, which is fine for display purposes.
+          const earned = buildEarnedTitle(leagueId, leagueName, i, member.points || 0);
+          batch.update(userRef, {
+            earned_titles: admin.firestore.FieldValue.arrayUnion(earned)
           });
         }
       }
 
       await batch.commit();
+
+      // 6c. Revoke auto_current_season titles from users who have dropped out of
+      //     the top 3 in this league. ONLY auto_current_season entries are
+      //     affected — admin_historical titles are permanent.
+      await revokeDisplacedTitles(leagueId, currentTop3, admin.firestore.FieldValue);
 
       console.log(`Updated rankings for league ${leagueId}: Champion is ${championData.champion_name}`);
       return null;
@@ -142,6 +214,104 @@ export const onPointsUpdate = functions.firestore
       throw error;
     }
   });
+
+/**
+ * Sweep users whose earned_titles array contains an auto_current_season title
+ * for this league but who are no longer in the top 3. Remove that entry from
+ * their earned_titles array, and clear displayed_title_id / pinned_title_ids
+ * if any referenced the lost title.
+ *
+ * This is the core "instant revocation" behavior — titles are only kept
+ * while the user actually holds the rank.
+ */
+async function revokeDisplacedTitles(
+  leagueId: string,
+  currentTop3: Set<string>,
+  fv: typeof admin.firestore.FieldValue
+): Promise<void> {
+  // Find users whose earned_titles contains any auto_current_season entry
+  // for this league. The straightforward field-equals query is:
+  //   users where earned_titles contains { source_id: leagueId, category: 'auto_current_season' }
+  // Firestore's array-contains on a complex object requires a precise equality,
+  // so we use a simpler approach: scan users in this league via the legacy
+  // members-indexed rank_title / league_champion_of fields, plus any user who
+  // held auto_current_season titles for this league.
+  const candidates = new Map<string, admin.firestore.DocumentReference>();
+
+  // 1. Anyone currently listed as champion of this league (the legacy
+  //    league_champion_of field) — even if they didn't make the new top 3,
+  //    they may still have an auto_current_season title entry.
+  const legacyHolders = await db
+    .collection('users')
+    .where('league_champion_of', '==', leagueId)
+    .get();
+  legacyHolders.docs.forEach(d => candidates.set(d.id, d.ref));
+
+  // 2. Anyone whose rank_title is set (in any league). For each, check whether
+  //    they have an auto_current_season EarnedTitle for THIS league. This catches
+  //    users who already had their legacy fields cleared but the title record
+  //    still lingered.
+  const rankTitleHolders = await db
+    .collection('users')
+    .where('rank_title', 'in', ['crown_champion', 'silver_sultan', 'bronze_boss'])
+    .get();
+  rankTitleHolders.docs.forEach(d => candidates.set(d.id, d.ref));
+
+  if (candidates.size === 0) return;
+
+  // For each candidate, inspect their earned_titles and decide what to revoke.
+  const userRefs = Array.from(candidates.values());
+  // Firestore 'in' query supports up to 30 ids per call
+  const chunks: admin.firestore.DocumentReference[][] = [];
+  for (let i = 0; i < userRefs.length; i += 30) chunks.push(userRefs.slice(i, i + 30));
+
+  for (const chunk of chunks) {
+    const snapshot = await db.getAll(...chunk);
+    const batch = db.batch();
+    let batchHasWrites = false;
+
+    for (const docSnap of snapshot) {
+      if (!docSnap.exists) continue;
+      const data = docSnap.data() ?? {};
+      const titles: any[] = Array.isArray(data.earned_titles) ? data.earned_titles : [];
+      const toRevoke = titles.filter(
+        (t) => t && t.category === 'auto_current_season' && t.source_id === leagueId
+      );
+      if (toRevoke.length === 0) continue;
+
+      const stillInTop3 = currentTop3.has(docSnap.id);
+
+      // If user is no longer in top 3, remove the titles.
+      const revokeIds = new Set(toRevoke.map((t) => t.id));
+      const newEarnedTitles = stillInTop3
+        ? titles
+        : titles.filter((t) => !revokeIds.has(t.id));
+
+      const update: Record<string, any> = {
+        earned_titles: newEarnedTitles
+      };
+
+      // If the displayed title was one of the revoked ones, clear it.
+      const displayedId: string | null = data.displayed_title_id ?? null;
+      if (!stillInTop3 && displayedId && revokeIds.has(displayedId)) {
+        update.displayed_title_id = null;
+      }
+
+      // Strip any revoked ids from pinned_title_ids.
+      const pinned: string[] = Array.isArray(data.pinned_title_ids) ? data.pinned_title_ids : [];
+      if (!stillInTop3 && pinned.some((id) => revokeIds.has(id))) {
+        update.pinned_title_ids = pinned.filter((id) => !revokeIds.has(id));
+      }
+
+      batch.update(docSnap.ref, update);
+      batchHasWrites = true;
+    }
+
+    if (batchHasWrites) {
+      await batch.commit();
+    }
+  }
+}
 
 /**
  * Cloud Function: recalculateAllRankings
@@ -249,3 +419,218 @@ export const initializeLeagueChampions = functions.firestore
     console.log('Initialized champions for new league:', leagueId);
     return null;
   });
+
+/**
+ * Cloud Function: createAdminTitle
+ *
+ * Admin creates a new title template (e.g. "Plumbing League Champion").
+ * Auth: global-admin only.
+ */
+export const createAdminTitle = functions.https.onCall(async (data, context) => {
+  await ensureGlobalAdmin(context);
+
+  const label = (data?.label ?? '').toString().trim();
+  const rankLabel = (data?.rank_label ?? '#1').toString();
+  const emoji = (data?.emoji ?? '🏆').toString();
+  if (!label) {
+    throw new functions.https.HttpsError('invalid-argument', 'Title label is required.');
+  }
+
+  const ref = db.collection('admin_titles').doc();
+  const payload = {
+    id: ref.id,
+    label,
+    rank_label: rankLabel,
+    emoji,
+    created_at: new Date().toISOString(),
+    created_by: context.auth!.uid
+  };
+  await ref.set(payload);
+  return payload;
+});
+
+/**
+ * Cloud Function: updateAdminTitle
+ *
+ * Admin edits an existing title template's label/rank/emoji.
+ */
+export const updateAdminTitle = functions.https.onCall(async (data, context) => {
+  await ensureGlobalAdmin(context);
+
+  const id = (data?.id ?? '').toString();
+  if (!id) throw new functions.https.HttpsError('invalid-argument', 'Title id required.');
+
+  const updates: Record<string, any> = {};
+  if (typeof data?.label === 'string') updates.label = data.label.trim();
+  if (typeof data?.rank_label === 'string') updates.rank_label = data.rank_label;
+  if (typeof data?.emoji === 'string') updates.emoji = data.emoji;
+
+  if (Object.keys(updates).length === 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'No updates provided.');
+  }
+
+  await db.collection('admin_titles').doc(id).update(updates);
+  return { id, ...updates };
+});
+
+/**
+ * Cloud Function: deleteAdminTitle
+ *
+ * Admin deletes a title template. Existing EarnedTitle entries that were
+ * created from this template will remain on user profiles (admin grants
+ * are permanent), but no new grants can be made.
+ */
+export const deleteAdminTitle = functions.https.onCall(async (data, context) => {
+  await ensureGlobalAdmin(context);
+  const id = (data?.id ?? '').toString();
+  if (!id) throw new functions.https.HttpsError('invalid-argument', 'Title id required.');
+  await db.collection('admin_titles').doc(id).delete();
+  return { id };
+});
+
+/**
+ * Cloud Function: grantAdminTitle
+ *
+ * Admin grants an admin-defined title to a user. The grant is permanent
+ * (admin_historical category, is_temporary=false). The user receives a new
+ * EarnedTitle entry appended to their earned_titles array.
+ *
+ * Calling grant twice for the same (userId, adminTitleId) creates two
+ * EarnedTitle entries, which the UI renders as a multi-emoji badge
+ * (e.g. Carl 🏆🏆).
+ */
+export const grantAdminTitle = functions.https.onCall(async (data, context) => {
+  await ensureGlobalAdmin(context);
+
+  const userId = (data?.userId ?? '').toString();
+  const adminTitleId = (data?.adminTitleId ?? '').toString();
+  if (!userId || !adminTitleId) {
+    throw new functions.https.HttpsError('invalid-argument', 'userId and adminTitleId required.');
+  }
+
+  const titleSnap = await db.collection('admin_titles').doc(adminTitleId).get();
+  if (!titleSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'Admin title definition not found.');
+  }
+  const def = titleSnap.data() as {
+    label: string;
+    rank_label: string;
+    emoji: string;
+  };
+
+  const userRef = db.collection('users').doc(userId);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'Target user not found.');
+  }
+
+  const earnedId = `${userId}_${adminTitleId}_${Date.now()}`;
+  const earned = {
+    id: earnedId,
+    type: 'admin_custom',
+    source_id: adminTitleId,
+    source_name: def.label,
+    rank_label: def.rank_label,
+    earned_at: new Date().toISOString(),
+    badge_variant: 'crown_champion' as const,
+    points_at_earn: 0,
+    category: 'admin_historical',
+    is_temporary: false,
+    custom_label: def.label,
+    custom_emoji: def.emoji
+  };
+
+  await userRef.update({
+    earned_titles: admin.firestore.FieldValue.arrayUnion(earned)
+  });
+
+  return { ok: true, earnedId };
+});
+
+/**
+ * Cloud Function: revokeAdminTitle
+ *
+ * Admin revokes a previously-granted admin title from a user. Removes the
+ * matching EarnedTitle entry from the user's earned_titles array, and clears
+ * displayed_title_id / pinned_title_ids if they referenced it.
+ */
+export const revokeAdminTitle = functions.https.onCall(async (data, context) => {
+  await ensureGlobalAdmin(context);
+
+  const userId = (data?.userId ?? '').toString();
+  const earnedTitleId = (data?.earnedTitleId ?? '').toString();
+  if (!userId || !earnedTitleId) {
+    throw new functions.https.HttpsError('invalid-argument', 'userId and earnedTitleId required.');
+  }
+
+  const userRef = db.collection('users').doc(userId);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'User not found.');
+  }
+  const data2 = userSnap.data() || {};
+  const titles: any[] = Array.isArray(data2.earned_titles) ? data2.earned_titles : [];
+  const target = titles.find((t) => t && t.id === earnedTitleId);
+  if (!target) {
+    throw new functions.https.HttpsError('not-found', 'Title entry not found on user.');
+  }
+
+  const newTitles = titles.filter((t) => t && t.id !== earnedTitleId);
+  const updates: Record<string, any> = { earned_titles: newTitles };
+
+  if (data2.displayed_title_id === earnedTitleId) {
+    updates.displayed_title_id = null;
+  }
+  const pinned: string[] = Array.isArray(data2.pinned_title_ids) ? data2.pinned_title_ids : [];
+  if (pinned.includes(earnedTitleId)) {
+    updates.pinned_title_ids = pinned.filter((id) => id !== earnedTitleId);
+  }
+
+  await userRef.update(updates);
+  return { ok: true, revokedId: earnedTitleId };
+});
+
+/**
+ * Cloud Function: revokeAdminTitleForUser
+ *
+ * Admin revokes ALL instances of a given adminTitleId from a user (e.g. revoke
+ * both Plumbing League Champion wins). Useful when the admin wants to clean
+ * up duplicates or undo a previously-granted definition.
+ */
+export const revokeAdminTitleForUser = functions.https.onCall(async (data, context) => {
+  await ensureGlobalAdmin(context);
+
+  const userId = (data?.userId ?? '').toString();
+  const adminTitleId = (data?.adminTitleId ?? '').toString();
+  if (!userId || !adminTitleId) {
+    throw new functions.https.HttpsError('invalid-argument', 'userId and adminTitleId required.');
+  }
+
+  const userRef = db.collection('users').doc(userId);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'User not found.');
+  }
+  const data2 = userSnap.data() || {};
+  const titles: any[] = Array.isArray(data2.earned_titles) ? data2.earned_titles : [];
+  const matchedIds = new Set(
+    titles.filter((t) => t && t.source_id === adminTitleId).map((t) => t.id)
+  );
+  if (matchedIds.size === 0) {
+    return { ok: true, revokedCount: 0 };
+  }
+
+  const newTitles = titles.filter((t) => !matchedIds.has(t.id));
+  const updates: Record<string, any> = { earned_titles: newTitles };
+
+  if (data2.displayed_title_id && matchedIds.has(data2.displayed_title_id)) {
+    updates.displayed_title_id = null;
+  }
+  const pinned: string[] = Array.isArray(data2.pinned_title_ids) ? data2.pinned_title_ids : [];
+  if (pinned.some((id) => matchedIds.has(id))) {
+    updates.pinned_title_ids = pinned.filter((id) => !matchedIds.has(id));
+  }
+
+  await userRef.update(updates);
+  return { ok: true, revokedCount: matchedIds.size };
+});

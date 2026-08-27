@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { LeaderboardEntry, Pick, Team, RankTitle } from '../types';
 import { ShieldCheck, Star, Crown, Medal, Award } from 'lucide-react';
 import { ChampionBadge, CompactBadge } from './ChampionBadge';
+import { UserNameWithTitle } from './UserNameWithTitle';
 
 interface LeaderboardProps {
   data: LeaderboardEntry[];
@@ -95,13 +96,12 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data, currentPicks = [
                       index + 1
                     )}
                   </div>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                      <span className="font-black text-slate-900 tracking-tight leading-none">{entry.user_name}</span>
-                      {positionTitle && showBadges && (
-                        <CompactBadge title={positionTitle} />
-                      )}
-                    </div>
+                  <div className="flex flex-col min-w-0">
+                    <UserNameWithTitle
+                      userId={entry.user_id}
+                      name={entry.user_name}
+                      nameClassName="font-black text-slate-900 tracking-tight leading-none"
+                    />
                     {/* Title badge for top 3 */}
                     {positionTitle && showBadges && (
                       <div className="mt-1.5">

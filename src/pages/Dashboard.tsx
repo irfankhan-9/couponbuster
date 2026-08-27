@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { doc, runTransaction, collection, setDoc } from 'firebase/firestore';
+import { doc, runTransaction, collection, setDoc, query, where } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { useLeagues, useLeagueMembers, useActiveWeek, useWeekPicks, useUsers } from '../hooks/useSyndicateData';
 import { formatCurrency } from '../utils/scoring';
@@ -10,6 +10,7 @@ import { processTurnHandover } from '../utils/draftLogic';
 import { DraftRoom } from '../components/DraftRoom';
 import { Leaderboard } from '../components/Leaderboard';
 import { MobileNav } from '../components/MobileNav';
+import { UserNameWithTitle } from '../components/UserNameWithTitle';
 import { Users, PiggyBank, ChevronLeft, ShieldCheck, Lock, AlertCircle, Moon } from 'lucide-react';
 import { Week, User } from '../types';
 import { TEAMS } from '../constants';
@@ -38,21 +39,24 @@ export const Dashboard: React.FC = () => {
 
   const isOwner = user?.uid === activeLeague?.owner_id;
 
-  // Self-heal: if the user profile document is missing (common for brand-new members)
-  // create it from the Auth profile so we don't bounce them back.
-  React.useEffect(() => {
-    if (user && !currentUserProfile && !isLoading) {
-      setDoc(doc(db, 'users', user.uid), {
-        display_name: user.displayName || user.email?.split('@')[0] || 'Member',
-        email: user.email || '',
-        role: 'member',
-        rank_title: null,
-        total_winnings_pence: 0,
-        created_at: new Date().toISOString()
-      }, { merge: true }).catch(() => { /* non-fatal */ });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, currentUserProfile, isLoading]);
+// Self-heal: if the user profile document is missing (common for brand-new members)
+    // create it from the Auth profile so we don't bounce them back.
+    React.useEffect(() => {
+      if (user && !currentUserProfile && !isLoading) {
+        setDoc(doc(db, 'users', user.uid), {
+          display_name: user.displayName || user.email?.split('@')[0] || 'Member',
+          email: user.email || '',
+          role: 'member',
+          rank_title: null,
+          total_winnings_pence: 0,
+          earned_titles: [],
+          displayed_title_id: null,
+          pinned_title_ids: [],
+          created_at: new Date().toISOString()
+        }, { merge: true }).catch(() => { /* non-fatal */ });
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, currentUserProfile, isLoading]);
 
   if (isLoading) {
     return (
@@ -161,7 +165,24 @@ export const Dashboard: React.FC = () => {
           throw new Error("It is not your turn!");
         }
 
-        // 3. Determine Pick ID (Compound Key for Uniqueness or Auto-ID)
+        // 3. CRITICAL: Check if team is already taken (prevent race condition)
+        // Query all picks for this week to verify team availability
+        const picksRef = collection(db, 'picks');
+        const picksQuery = query(picksRef, where('week_id', '==', freshWeek.id));
+        const picksSnapshot = await transaction.get(picksQuery);
+
+        const takenTeamIds = new Set<string>();
+        picksSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.pick1_team_id) takenTeamIds.add(data.pick1_team_id);
+          if (data.pick2_team_id) takenTeamIds.add(data.pick2_team_id);
+        });
+
+        if (takenTeamIds.has(teamId)) {
+          throw new Error("This team has already been picked by another user!");
+        }
+
+        // 4. Determine Pick ID (Compound Key for Uniqueness or Auto-ID)
         // We'll search for existing pick for this user/week in memory first isn't enough for transaction safety
         // But since we are creating new picks usually, let's use a deterministic ID or just Add.
         // Master Plan says: "Create/Update picks doc".
@@ -195,7 +216,7 @@ export const Dashboard: React.FC = () => {
           });
         }
 
-        // 4. Handover Turn
+        // 5. Handover Turn
         const updates = processTurnHandover(freshWeek, freshWeek.pick_order);
         transaction.update(weekRef, updates);
       });

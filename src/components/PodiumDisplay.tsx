@@ -1,6 +1,7 @@
 import React from 'react';
 import { RankTitle } from '../types';
 import { Crown, Medal, Award, Trophy } from 'lucide-react';
+import { UserNameWithTitle } from './UserNameWithTitle';
 
 interface PodiumEntry {
   user_id: string;
@@ -136,8 +137,12 @@ export const PodiumDisplay: React.FC<PodiumDisplayProps> = ({ entries, showLeagu
 
             {/* Name & Badge */}
             <div className="mt-4 text-center">
-              <p className="font-black text-slate-800 text-sm md:text-base truncate max-w-[100px]">
-                {second.user_name}
+              <p className="font-black text-slate-800 text-sm md:text-base truncate max-w-[120px] inline-flex items-center justify-center gap-1">
+                <UserNameWithTitle
+                  userId={second.user_id}
+                  name={second.user_name}
+                  nameClassName="font-black text-slate-800 text-sm md:text-base truncate"
+                />
               </p>
               <div className={`
                 inline-flex items-center gap-1 px-2 py-1 rounded-full
@@ -223,8 +228,12 @@ export const PodiumDisplay: React.FC<PodiumDisplayProps> = ({ entries, showLeagu
 
             {/* Name & Badge */}
             <div className="mt-4 text-center">
-              <p className="font-black text-slate-800 text-base md:text-lg">
-                {first.user_name}
+              <p className="font-black text-slate-800 text-base md:text-lg inline-flex items-center justify-center gap-1.5">
+                <UserNameWithTitle
+                  userId={first.user_id}
+                  name={first.user_name}
+                  nameClassName="font-black text-slate-800 text-base md:text-lg"
+                />
               </p>
               <div className={`
                 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full
@@ -303,8 +312,12 @@ export const PodiumDisplay: React.FC<PodiumDisplayProps> = ({ entries, showLeagu
 
             {/* Name & Badge */}
             <div className="mt-4 text-center">
-              <p className="font-black text-slate-800 text-sm md:text-base truncate max-w-[100px]">
-                {third.user_name}
+              <p className="font-black text-slate-800 text-sm md:text-base truncate max-w-[120px] inline-flex items-center justify-center gap-1">
+                <UserNameWithTitle
+                  userId={third.user_id}
+                  name={third.user_name}
+                  nameClassName="font-black text-slate-800 text-sm md:text-base truncate"
+                />
               </p>
               <div className={`
                 inline-flex items-center gap-1 px-2 py-1 rounded-full

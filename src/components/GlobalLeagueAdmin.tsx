@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Crown, Settings, RefreshCw, ToggleLeft, ToggleRight, AlertTriangle, DollarSign, Users, Clock, Check, X, UserPlus, UserMinus, Trash2 } from 'lucide-react';
 import { useGlobalLeague, useGlobalLeagueEntries, useGlobalLeagueRequests } from '../hooks/useSyndicateData';
 import { db } from '../lib/firebase';
@@ -404,7 +405,12 @@ export const GlobalLeagueAdmin: React.FC = () => {
                     <Users className="h-5 w-5 text-emerald-600" />
                   </div>
                   <div>
-                    <p className="font-black text-slate-900">{request.display_name}</p>
+                    <Link
+                      to={`/profile/${request.user_id}`}
+                      className="font-black text-slate-900 hover:underline decoration-emerald-500/60 underline-offset-2"
+                    >
+                      {request.display_name}
+                    </Link>
                     <p className="text-xs text-slate-500 flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       {new Date(request.requested_at).toLocaleDateString()} at {new Date(request.requested_at).toLocaleTimeString()}
@@ -504,7 +510,12 @@ export const GlobalLeagueAdmin: React.FC = () => {
                         <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-100 to-emerald-200 flex items-center justify-center font-black text-emerald-700">
                           {(entry.display_name || '?').charAt(0).toUpperCase()}
                         </div>
-                        <span className="font-bold text-slate-800">{entry.display_name}</span>
+                        <Link
+                          to={`/profile/${entry.user_id}`}
+                          className="font-bold text-slate-800 hover:underline decoration-emerald-500/60 underline-offset-2"
+                        >
+                          {entry.display_name}
+                        </Link>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">

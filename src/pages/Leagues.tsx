@@ -9,6 +9,7 @@ import { ChampionBadge } from '../components/ChampionBadge';
 import { RankTitle } from '../types';
 import { Users, Lock, Globe, ShieldCheck, ChevronRight, AlertCircle, Crown } from 'lucide-react';
 import { formatCurrency } from '../utils/scoring';
+import { UserNameWithTitle } from '../components/UserNameWithTitle';
 
 export const Leagues: React.FC = () => {
   const [user, authLoading] = useAuthState(auth);
@@ -79,6 +80,9 @@ export const Leagues: React.FC = () => {
                 role: 'member',
                 rank_title: null,
                 total_winnings_pence: 0,
+                earned_titles: [],
+                displayed_title_id: null,
+                pinned_title_ids: [],
                 created_at: new Date().toISOString()
             }, { merge: true });
       setJoinSuccess('Join request sent');
@@ -158,7 +162,8 @@ export const Leagues: React.FC = () => {
                     {/* Champion Indicator */}
                     {champion && (
                       <Link
-                        to="/leaderboard"
+                        to={`/profile/${champion.user_id}`}
+                        onClick={(e) => e.stopPropagation()}
                         className="flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-full border border-yellow-100 hover:border-yellow-200 transition-colors"
                       >
                         <Crown className="h-3 w-3 text-yellow-500 fill-current" />

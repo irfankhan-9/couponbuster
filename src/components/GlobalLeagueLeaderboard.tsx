@@ -4,6 +4,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../lib/firebase';
 import { useGlobalLeagueEntries } from '../hooks/useSyndicateData';
 import { ChampionBadge } from './ChampionBadge';
+import { UserNameWithTitle } from './UserNameWithTitle';
 import { RankTitle } from '../types';
 
 export const GlobalLeagueLeaderboard: React.FC = () => {
@@ -115,12 +116,16 @@ export const GlobalLeagueLeaderboard: React.FC = () => {
                         </div>
 
                         <span className={`
-                          font-bold
+                          font-bold inline-flex items-center gap-1.5 max-w-full
                           ${isCurrentUser ? 'text-emerald-700' : 'text-slate-800'}
                         `}>
-                          {entry.display_name}
+                          <UserNameWithTitle
+                            userId={entry.user_id}
+                            name={entry.display_name}
+                            nameClassName={`font-bold ${isCurrentUser ? 'text-emerald-700' : 'text-slate-800'}`}
+                          />
                           {isCurrentUser && (
-                            <span className="ml-2 text-xs font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">You</span>
+                            <span className="text-xs font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">You</span>
                           )}
                         </span>
                       </div>

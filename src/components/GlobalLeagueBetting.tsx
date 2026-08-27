@@ -6,6 +6,7 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, doc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { useGlobalLeague, useGlobalLeagueEntries, useGlobalLeagueRequests } from '../hooks/useSyndicateData';
 import { ChampionBadge } from './ChampionBadge';
+import { UserNameWithTitle } from './UserNameWithTitle';
 import { RankTitle } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -134,7 +135,12 @@ export const GlobalLeagueBetting: React.FC = () => {
           </p>
           <div className="flex items-center gap-4 flex-wrap">
             <ChampionBadge title={RankTitle.GLOBAL_CROWN_CHAMPION} size="lg" animated />
-            <span className="text-2xl font-black text-white">{currentChampion.display_name}</span>
+            <Link
+              to={`/profile/${currentChampion.user_id}`}
+              className="text-2xl font-black text-white hover:underline decoration-yellow-400/60 underline-offset-4"
+            >
+              {currentChampion.display_name}
+            </Link>
             <span className="text-emerald-400 font-bold text-lg">{currentChampion.total_points} pts</span>
             <Link
               to="/global-league/leaderboard"
@@ -167,7 +173,12 @@ export const GlobalLeagueBetting: React.FC = () => {
                 <div key={entry.id} className={`flex flex-col items-center ${positions[index]}`}>
                   <div className="text-4xl md:text-5xl mb-3">{medals[index]}</div>
                   <div className={`w-full bg-gradient-to-t ${bgColors[index]} to-transparent rounded-t-2xl p-4 text-center`}>
-                    <p className="font-black text-white text-sm md:text-base truncate">{entry.display_name}</p>
+                    <Link
+                      to={`/profile/${entry.user_id}`}
+                      className="block font-black text-white text-sm md:text-base truncate hover:underline decoration-yellow-300/70 underline-offset-2"
+                    >
+                      {entry.display_name}
+                    </Link>
                     <p className="text-white/90 font-bold text-lg md:text-xl">{entry.total_points}</p>
                     <p className="text-white/60 text-xs">pts</p>
                     {entry.is_global_crown_champion && (

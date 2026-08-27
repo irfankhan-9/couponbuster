@@ -3,6 +3,7 @@ import { TEAMS, LEAGUES } from '../constants';
 import { Week, Pick, LeagueMember, User } from '../types';
 import { getAvailableTeams } from '../utils/draftLogic';
 import { Star, ShieldCheck, Clock, User as UserIcon, Lock, CheckCircle, RefreshCcw, Trophy, ArrowUpCircle } from 'lucide-react';
+import { UserNameWithTitle } from './UserNameWithTitle';
 
 interface DraftRoomProps {
     week: Week;
@@ -115,7 +116,11 @@ export const DraftRoom: React.FC<DraftRoomProps> = ({
 
                         return (
                             <div key={userId} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                <span className="font-bold text-slate-700">{user?.display_name}</span>
+                                <UserNameWithTitle
+                                    userId={userId}
+                                    name={user?.display_name}
+                                    nameClassName="font-bold text-slate-700"
+                                />
                                 <div className="flex space-x-3">
                                     {team1 && <span className="px-3 py-1 bg-white border border-yellow-200 text-yellow-700 rounded-lg text-xs font-black shadow-sm flex items-center"><Star className="h-3 w-3 mr-1" fill="currentColor" /> {team1.name}</span>}
                                     {team2 && <span className="px-3 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-black shadow-sm flex items-center"><ShieldCheck className="h-3 w-3 mr-1" /> {team2.name}</span>}
@@ -368,7 +373,13 @@ export const DraftRoom: React.FC<DraftRoomProps> = ({
                         </div>
                         {currentPicker ? (
                             <>
-                                <h3 className="text-2xl font-black text-slate-900 mb-2">Waiting for {currentPicker.display_name}</h3>
+                                <h3 className="text-2xl font-black text-slate-900 mb-2 inline-flex items-center gap-1.5 justify-center">
+                                    Waiting for <UserNameWithTitle
+                                        userId={currentPicker.id}
+                                        name={currentPicker.display_name}
+                                        nameClassName="font-black text-slate-900"
+                                    />
+                                </h3>
                                 <p className="text-slate-400 max-w-md mx-auto mb-6">
                                     The draft is currently in progress.
                                     {week.draft_round === 2 && " We are in Round 2 (Cover Picks)."}
