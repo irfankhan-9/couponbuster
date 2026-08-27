@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { doc, runTransaction, collection, setDoc, query, where } from 'firebase/firestore';
+import { doc, runTransaction, collection, setDoc, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { useLeagues, useLeagueMembers, useActiveWeek, useWeekPicks, useUsers } from '../hooks/useSyndicateData';
 import { formatCurrency } from '../utils/scoring';
@@ -12,7 +12,7 @@ import { Leaderboard } from '../components/Leaderboard';
 import { MobileNav } from '../components/MobileNav';
 import { UserNameWithTitle } from '../components/UserNameWithTitle';
 import { Users, PiggyBank, ChevronLeft, ShieldCheck, Lock, AlertCircle, Moon } from 'lucide-react';
-import { Week, User } from '../types';
+import { Week, User, Pick } from '../types';
 import { TEAMS } from '../constants';
 
 export const Dashboard: React.FC = () => {
@@ -152,6 +152,27 @@ export const Dashboard: React.FC = () => {
     if (!displayWeek || !user) return;
 
     try {
+      // 0. PRE-CHECK (outside the transaction): Read all picks for this week
+      // using a normal query — client-side transactions in Firestore only
+      // support `transaction.get(docRef)`, NOT `transaction.get(query)`.
+      // Doing the duplicate check OUTSIDE the transaction is fine because
+      // the transaction itself will retry on conflicts and we re-validate
+      // inside it via the deterministic pick doc read.
+      const picksRef = collection(db, 'picks');
+      const picksQuery = query(picksRef, where('week_id', '==', displayWeek.id));
+      const picksSnapshot = await getDocs(picksQuery);
+
+      const takenTeamIds = new Set<string>();
+      picksSnapshot.docs.forEach(pickDoc => {
+        const data = pickDoc.data();
+        if (data.pick1_team_id) takenTeamIds.add(data.pick1_team_id);
+        if (data.pick2_team_id) takenTeamIds.add(data.pick2_team_id);
+      });
+
+      if (takenTeamIds.has(teamId)) {
+        throw new Error("This team has already been picked by another user!");
+      }
+
       await runTransaction(db, async (transaction) => {
         // 1. Get Fresh Week Data (Consistency Check)
         const weekRef = doc(db, 'weeks', displayWeek.id);
@@ -165,48 +186,33 @@ export const Dashboard: React.FC = () => {
           throw new Error("It is not your turn!");
         }
 
-        // 3. CRITICAL: Check if team is already taken (prevent race condition)
-        // Query all picks for this week to verify team availability
-        const picksRef = collection(db, 'picks');
-        const picksQuery = query(picksRef, where('week_id', '==', freshWeek.id));
-        const picksSnapshot = await transaction.get(picksQuery);
-
-        const takenTeamIds = new Set<string>();
-        picksSnapshot.docs.forEach(doc => {
-          const data = doc.data();
-          if (data.pick1_team_id) takenTeamIds.add(data.pick1_team_id);
-          if (data.pick2_team_id) takenTeamIds.add(data.pick2_team_id);
-        });
-
-        if (takenTeamIds.has(teamId)) {
-          throw new Error("This team has already been picked by another user!");
-        }
-
-        // 4. Determine Pick ID (Compound Key for Uniqueness or Auto-ID)
-        // We'll search for existing pick for this user/week in memory first isn't enough for transaction safety
-        // But since we are creating new picks usually, let's use a deterministic ID or just Add.
-        // Master Plan says: "Create/Update picks doc".
-        // Let's use deterministic ID: `weekID_userID` to prevent duplicates easily.
+        // 3. Re-validate duplicate using the current user's existing pick
+        // (deterministic document ref, transaction-safe).
         const pickId = `${freshWeek.id}_${user.uid}`;
         const pickRef = doc(db, 'picks', pickId);
         const pickDoc = await transaction.get(pickRef);
 
         if (pickDoc.exists()) {
-          // Updating existing pick (Round 2?)
-          // Check if we are in Round 2
+          const existing = pickDoc.data() as Pick;
+          // If picking round 2, ensure the banker (pick1) doesn't equal teamId
+          if (freshWeek.draft_round === 2 && existing.pick1_team_id === teamId) {
+            throw new Error("You can't pick the same team for both your Banker and Cover!");
+          }
+          // If picking round 1, ensure we're not overwriting a valid banker
+          if (freshWeek.draft_round === 1 && existing.pick1_team_id) {
+            // Already had a pick1 — block overwrite (picks are irreversible)
+            throw new Error("Your Banker pick is already locked in.");
+          }
+        }
+
+        // 4. Write the pick (Round 1 -> pick1, Round 2 -> pick2)
+        if (pickDoc.exists()) {
           if (freshWeek.draft_round === 2) {
-            transaction.update(pickRef, {
-              pick2_team_id: teamId
-            });
+            transaction.update(pickRef, { pick2_team_id: teamId });
           } else {
-            // Should not happen in linear draft unless correcting?
-            // Overwriting Round 1 pick if still active?
-            transaction.update(pickRef, {
-              pick1_team_id: teamId
-            });
+            transaction.update(pickRef, { pick1_team_id: teamId });
           }
         } else {
-          // New Pick
           transaction.set(pickRef, {
             week_id: freshWeek.id,
             user_id: user.uid,
