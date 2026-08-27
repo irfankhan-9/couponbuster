@@ -394,12 +394,25 @@ export const DraftRoom: React.FC<DraftRoomProps> = ({
                                     <span className="font-bold text-indigo-600">Waiting for Admin to start the draft...</span>
                                 </p>
                             </>
-                        ) : (
+                        ) : week.draft_status === 'paused' ? (
                             <>
                                 <h3 className="text-2xl font-black text-slate-900 mb-2">Round {currentRound} Complete</h3>
                                 <p className="text-slate-400 max-w-md mx-auto mb-6">
                                     All picks for this round are saved. <br />
                                     <span className="font-bold text-emerald-600">Waiting for Admin to start Round {currentRound + 1}...</span>
+                                </p>
+                            </>
+                        ) : (
+                            // Fallback: draft_status is 'active' but no picker is currently
+                            // resolvable. This usually means the pick_order has a user id
+                            // that doesn't exist in the loaded users list, or the week
+                            // is mid-transition. Show a neutral waiting message rather
+                            // than falsely announcing that the round is complete.
+                            <>
+                                <h3 className="text-2xl font-black text-slate-900 mb-2">Draft In Progress</h3>
+                                <p className="text-slate-400 max-w-md mx-auto mb-6">
+                                    Waiting for the next player to make their pick. <br />
+                                    <span className="font-bold text-indigo-600">If this persists, ask the admin to advance the turn.</span>
                                 </p>
                             </>
                         )}
