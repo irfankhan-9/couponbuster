@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { TEAMS, LEAGUES } from '../constants';
 import { Week, Pick, LeagueMember, User } from '../types';
 import { getAvailableTeams } from '../utils/draftLogic';
-import { Star, ShieldCheck, Clock, User as UserIcon, Lock, CheckCircle, RefreshCcw, Trophy, ArrowUpCircle } from 'lucide-react';
+import { Star, ShieldCheck, Clock, User as UserIcon, Lock, CheckCircle, RefreshCcw, Trophy, ArrowUpCircle, TrendingUp } from 'lucide-react';
 import { UserNameWithTitle } from './UserNameWithTitle';
+import { useSyndicateOdds } from '../services/oddsService';
 
 interface DraftRoomProps {
     week: Week;
@@ -25,6 +26,7 @@ export const DraftRoom: React.FC<DraftRoomProps> = ({
     const [selectedTeam, setSelectedTeam] = useState<string>('');
     const [selectedLeagueId, setSelectedLeagueId] = useState<string>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const { getOddsForTeam } = useSyndicateOdds();
 
     // Derive State
     const isMyTurn = week.current_turn_user_id === currentUser.id;
@@ -297,21 +299,30 @@ export const DraftRoom: React.FC<DraftRoomProps> = ({
                                 {/* Mobile Team Grid */}
                                 <div className="md:hidden grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2 no-scrollbar">
                                     {availableTeams.length > 0 ? (
-                                        availableTeams.map(team => (
-                                            <button
-                                                key={team.id}
-                                                onClick={() => setSelectedTeam(team.id)}
-                                                className={`
-                                                    flex flex-col items-center justify-center p-4 rounded-[2rem] border-2 transition-all duration-300
-                                                    ${selectedTeam === team.id ? 'border-emerald-600 bg-emerald-50 shadow-md scale-[0.98]' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}
-                                                `}
-                                            >
-                                                <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center mb-2 shadow-sm border border-slate-100">
-                                                    <ShieldCheck className={`h-5 w-5 ${selectedTeam === team.id ? 'text-emerald-600' : 'text-slate-300'}`} />
-                                                </div>
-                                                <span className="text-[11px] font-black text-slate-900 leading-tight text-center">{team.name}</span>
-                                            </button>
-                                        ))
+                                        availableTeams.map(team => {
+                                            const teamOdds = getOddsForTeam(team.name);
+                                            return (
+                                                <button
+                                                    key={team.id}
+                                                    onClick={() => setSelectedTeam(team.id)}
+                                                    className={`
+                                                        flex flex-col items-center justify-center p-4 rounded-[2rem] border-2 transition-all duration-300 relative
+                                                        ${selectedTeam === team.id ? 'border-emerald-600 bg-emerald-50 shadow-md scale-[0.98]' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}
+                                                    `}
+                                                >
+                                                    <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center mb-2 shadow-sm border border-slate-100">
+                                                        <ShieldCheck className={`h-5 w-5 ${selectedTeam === team.id ? 'text-emerald-600' : 'text-slate-300'}`} />
+                                                    </div>
+                                                    <span className="text-[11px] font-black text-slate-900 leading-tight text-center">{team.name}</span>
+                                                    {teamOdds && (
+                                                        <span className="mt-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-yellow-400 text-slate-950 border border-yellow-500/30 shadow-xs">
+                                                            <TrendingUp className="h-2.5 w-2.5 mr-0.5" />
+                                                            Bet365 ({teamOdds.dayOfWeek}) {teamOdds.fractionalOdds}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            );
+                                        })
                                     ) : (
                                         <div className="col-span-2 py-8 text-center bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
                                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No Teams Left in this League</p>
@@ -322,19 +333,28 @@ export const DraftRoom: React.FC<DraftRoomProps> = ({
                                 {/* Desktop View for Teams */}
                                 <div className="hidden md:grid grid-cols-4 lg:grid-cols-6 gap-3">
                                     {availableTeams.length > 0 ? (
-                                        availableTeams.map(team => (
-                                            <button
-                                                key={team.id}
-                                                onClick={() => setSelectedTeam(team.id)}
-                                                className={`
-                                                    flex flex-col items-center justify-center p-4 rounded-3xl border-2 transition-all duration-300
-                                                    ${selectedTeam === team.id ? 'border-emerald-600 bg-emerald-50 shadow-md scale-[0.95]' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}
-                                                `}
-                                            >
-                                                <ShieldCheck className={`h-6 w-6 mb-2 ${selectedTeam === team.id ? 'text-emerald-600' : 'text-slate-300'}`} />
-                                                <span className="text-[10px] font-black text-slate-900 text-center leading-none">{team.name}</span>
-                                            </button>
-                                        ))
+                                        availableTeams.map(team => {
+                                            const teamOdds = getOddsForTeam(team.name);
+                                            return (
+                                                <button
+                                                    key={team.id}
+                                                    onClick={() => setSelectedTeam(team.id)}
+                                                    className={`
+                                                        flex flex-col items-center justify-center p-4 rounded-3xl border-2 transition-all duration-300 relative
+                                                        ${selectedTeam === team.id ? 'border-emerald-600 bg-emerald-50 shadow-md scale-[0.95]' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}
+                                                    `}
+                                                >
+                                                    <ShieldCheck className={`h-6 w-6 mb-2 ${selectedTeam === team.id ? 'text-emerald-600' : 'text-slate-300'}`} />
+                                                    <span className="text-[10px] font-black text-slate-900 text-center leading-none mb-1">{team.name}</span>
+                                                    {teamOdds && (
+                                                        <span className="mt-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black bg-yellow-400 text-slate-950 border border-yellow-500/30 shadow-xs">
+                                                            <TrendingUp className="h-2.5 w-2.5 mr-0.5" />
+                                                            Bet365 ({teamOdds.dayOfWeek}) {teamOdds.fractionalOdds}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            );
+                                        })
                                     ) : (
                                         <div className="col-span-4 lg:col-span-6 py-10 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
                                             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">League Fully Drafted</p>

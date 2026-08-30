@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { TEAMS, LEAGUES } from '../constants';
 import { Week } from '../types';
 import { AlertCircle, Clock, Star, ShieldCheck } from 'lucide-react';
+import { useSyndicateOdds } from '../services/oddsService';
 
 interface PickFormProps {
   week: Week;
@@ -14,6 +15,7 @@ export const PickForm: React.FC<PickFormProps> = ({ week, onSubmit, existingPick
   const [pick2, setPick2] = useState<string>(existingPicks?.team2 || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { getOddsForTeam } = useSyndicateOdds();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,11 +120,14 @@ export const PickForm: React.FC<PickFormProps> = ({ week, onSubmit, existingPick
               <option value="">Select your Banker...</option>
               {bankerLeagues.map(league => (
                 <optgroup key={league.id} label={league.name}>
-                  {getTeamsForLeague(league.id).map(team => (
-                    <option key={team.id} value={team.id} disabled={team.id === pick2}>
-                      {team.name} ({team.country})
-                    </option>
-                  ))}
+                  {getTeamsForLeague(league.id).map(team => {
+                    const teamOdds = getOddsForTeam(team.name);
+                    return (
+                      <option key={team.id} value={team.id} disabled={team.id === pick2}>
+                        {team.name} ({team.country}){teamOdds ? ` — Bet365 (${teamOdds.dayOfWeek}): ${teamOdds.fractionalOdds}` : ''}
+                      </option>
+                    );
+                  })}
                 </optgroup>
               ))}
             </select>
@@ -152,11 +157,14 @@ export const PickForm: React.FC<PickFormProps> = ({ week, onSubmit, existingPick
               <option value="">Select your Cover team...</option>
               {coverLeagues.map(league => (
                 <optgroup key={league.id} label={league.name}>
-                  {getTeamsForLeague(league.id).map(team => (
-                    <option key={team.id} value={team.id} disabled={team.id === pick1}>
-                      {team.name} ({team.country})
-                    </option>
-                  ))}
+                  {getTeamsForLeague(league.id).map(team => {
+                    const teamOdds = getOddsForTeam(team.name);
+                    return (
+                      <option key={team.id} value={team.id} disabled={team.id === pick1}>
+                        {team.name} ({team.country}){teamOdds ? ` — Bet365 (${teamOdds.dayOfWeek}): ${teamOdds.fractionalOdds}` : ''}
+                      </option>
+                    );
+                  })}
                 </optgroup>
               ))}
             </select>
